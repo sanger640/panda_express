@@ -1,0 +1,8 @@
+[2025-11-13 12:56:06,441][__main__][INFO] - Adding /home/sanger/fairo/polymetis/polymetis/build to $PATH
+[2025-11-13 12:56:06,562][polymetis.robot_client.executable_robot_client][INFO] - === Config: ===
+exec: franka_hand_client
+robot_ip: 172.16.0.2
+control_ip: 0.0.0.0
+control_port: 50052
+robot_client_metadata_path: /tmp/tmpo4w46_ve
+
