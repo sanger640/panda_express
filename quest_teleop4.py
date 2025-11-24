@@ -8,11 +8,112 @@ from scipy.spatial.transform import Rotation as R
 import ssl
 import time
 import grpc  # for RpcError checks
+import pyrealsense2 as rs
+import cv2
+import os
+import threading
+import queue
 
 MAX_POSITION_STEP = 0.02   # smaller step for safety
 WORKSPACE_RADIUS = 0.25    # slightly smaller workspace
 WORKSPACE_MIN_Z = 0.08
 ROBOT_BASE = np.array([0.0, 0.0, 0.0])
+
+class RealSenseRGBRecorder:
+    def __init__(self, save_folder="rgb_frames"):
+        self.pipeline = rs.pipeline()
+        config = rs.config()
+        config.enable_stream(rs.stream.color, 320, 240, rs.format.bgr8, 30)
+        self.pipeline.start(config)
+        self.save_folder = save_folder
+        os.makedirs(save_folder, exist_ok=True)
+
+        self.frame_queue = queue.Queue(maxsize=2000)  # buffer to store frames before saving
+        self.running = False  # start stopped
+
+    def start(self):
+        if not self.running:
+            self.running = True
+            self.saving_thread = threading.Thread(target=self._saving_worker, daemon=True)
+            self.saving_thread.start()
+            self.rgb_thread = threading.Thread(target=self.capture_frame)
+            self.rgb_thread.start()
+
+    def capture_frame(self):
+        while self.running:
+            frames = self.pipeline.wait_for_frames()
+            color_frame = frames.get_color_frame()
+            if not color_frame:
+                return
+            img = np.asanyarray(color_frame.get_data())
+            timestamp = time.time()
+            self.latest_rgb_timestamp = timestamp
+            try:
+                self.frame_queue.put_nowait((timestamp, img))
+            except queue.Full:
+                print("[WARNING] Frame queue full, dropping frame")
+
+    def _saving_worker(self):
+        while self.running or not self.frame_queue.empty():
+            try:
+                timestamp, img = self.frame_queue.get(timeout=0.1)
+                filename = os.path.join(self.save_folder, f"{int(timestamp * 1000)}.png")
+                cv2.imwrite(filename, img)
+                self.frame_queue.task_done()
+            except queue.Empty:
+                pass  # wait for frames
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            self.saving_thread.join()
+            self.rgb_thread.join()
+            self.pipeline.stop()
+        
+class TeleopRecorder:
+    def __init__(self):
+        self.pipeline = rs.pipeline()
+        config = rs.config()
+        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+        self.pipeline.start(config)
+        self.rgb_running = False
+        self.rgb_folder = "rgb_frames"
+        os.makedirs(self.rgb_folder, exist_ok=True)
+        self.latest_rgb_frame = None
+        self.latest_rgb_timestamp = None
+
+        # Start RGB capture thread
+        self.rgb_thread = None
+        # self.rgb_thread.start()
+        # self.rgb_thread = None
+
+        # For storing EE poses (timestamped)
+        self.ee_poses = []
+
+    def capture_rgb_frames(self):
+        while self.rgb_running:
+            frames = self.pipeline.wait_for_frames()
+            color_frame = frames.get_color_frame()
+            if not color_frame:
+                continue
+            img = np.asanyarray(color_frame.get_data())
+            timestamp = time.time()
+            filename = os.path.join(self.rgb_folder, f"{int(timestamp*1000)}.png")
+            cv2.imwrite(filename, img)
+            self.latest_rgb_frame = img
+            self.latest_rgb_timestamp = timestamp
+            time.sleep(1/30)  # enforce ~30Hz
+
+    def record_ee_pose(self, pose):
+        timestamp = time.time()
+        self.ee_poses.append({'timestamp': timestamp, 'pose': pose})
+        # Optionally associate nearest RGB frame timestamp here
+
+    def stop(self):
+        self.rgb_running = False
+        self.rgb_thread.join()
+        self.pipeline.stop()
+        # Save pose data to file here if needed
 
 class AdvancedQuestRobotTeleop:
     """Advanced teleoperation with position AND orientation control"""
@@ -46,7 +147,7 @@ class AdvancedQuestRobotTeleop:
         self.prev_target_quat = None
 
         # Control parameters (slow & gentle)
-        self.position_scale = 1.4
+        self.position_scale = 2.0
         self.rotation_scale = 0.3  # kept for future use if you scale rotation
 
         # For control-rate throttling (~10 Hz)
@@ -70,9 +171,12 @@ class AdvancedQuestRobotTeleop:
         self.recording = False
         self.trajectory_data = []
         self.record_start_time = None
-
+        self._grip_pressed  = False
         # Gripper state
         self.last_gripper_closed = False
+
+        # Initialize recorder but do not start RGB thread yet
+        self.recorder = RealSenseRGBRecorder()
 
     def transform_controller_to_robot(self, pos):
         # Map: Robot X = -Controller Z, Robot Y = -Controller X, Robot Z = Controller Y
@@ -252,6 +356,7 @@ class AdvancedQuestRobotTeleop:
                     else:
                         raise e
 
+                # self.recorder.capture_frame()
                 # Gripper control
                 gripper_closed = trigger_value > 0.5
                 if gripper_closed != self.last_gripper_closed:
@@ -264,14 +369,37 @@ class AdvancedQuestRobotTeleop:
                         self.gripper.goto(width=0.25, speed=0.05, force=0.1)
                     self.last_gripper_closed = gripper_closed
                 # Recording toggle
-                if grip_button > 0.5 and not hasattr(self, '_grip_pressed'):
+                # if grip_button > 0.5:
+                #     self._grip_pressed = not self._grip_pressed
+                #     print("grip button test")
+                #     self.toggle_recording()
+                # Grip button logic to start/stop recording
+                if grip_button > 0.5 and not self._grip_pressed:
                     self._grip_pressed = True
-                    self.toggle_recording()
-                elif grip_button <= 0.5:
+                    self.recording = True
+                    self.trajectory_data = []
+                    self.record_start_time = time.time()
+                    self.recorder.start()
+                    print("Grip pressed. Starting recording.")
+                elif grip_button <= 0.5 and self._grip_pressed:
                     self._grip_pressed = False
+                    self.recording = False
+                    self.save_trajectory()
+                    self.recorder.stop()
+                    print("Grip released. Stopping recording.")
+                    
 
                 if self.recording:
-                    self.record_waypoint(target_pos_tensor, target_quat_tensor, gripper_closed)
+                    if self.enable_orientation:
+                        self.record_waypoint(target_pos_tensor, target_quat_tensor, gripper_closed)
+                    else:
+                        self.record_waypoint(target_pos_tensor, self.initial_robot_quat, gripper_closed)
+                # Record pose at 10Hz as before
+                # pose_dict = {
+                #     'position': target_pos,
+                #     'orientation': target_quat_tensor.numpy() if self.enable_orientation else self.initial_robot_quat.numpy()
+                # }
+                # self.recorder.record_ee_pose(pose_dict)
 
             except json.JSONDecodeError as e:
                 print(f"JSON decode error: {e}")
@@ -290,9 +418,31 @@ class AdvancedQuestRobotTeleop:
             self.recording = False
             print(f"\n⏹ RECORDING STOPPED ({len(self.trajectory_data)} waypoints)")
             self.save_trajectory()
+    
+    def start_recording(self):
+        self.trajectory_data = []
+        self.record_start_time = time.time()
+        # Start RealSense RGB capture thread
+        if not self.recorder.rgb_running:
+            self.recorder.rgb_running = True
+            self.recorder.rgb_thread = threading.Thread(target=self.recorder.capture_rgb_frames)
+            self.recorder.rgb_thread.start()
+        self.recording = True
+        print("\n🔴 RECORDING STARTED")
+    def stop_recording(self):
+        # Stop RealSense RGB capture thread
+        if self.recorder.rgb_running:
+            self.recorder.rgb_running = False
+            self.recorder.rgb_thread.join()
+            self.recorder.pipeline.stop()
+        self.recording = False
+        self.save_trajectory()
+        print(f"\n⏹ RECORDING STOPPED ({len(self.trajectory_data)} waypoints)")
+        
+        
 
     def record_waypoint(self, position, orientation, gripper):
-        timestamp = asyncio.get_event_loop().time() - self.record_start_time
+        timestamp = time.time()
         self.trajectory_data.append({
             'timestamp': timestamp,
             'position': position.numpy().tolist(),

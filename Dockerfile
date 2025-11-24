@@ -52,7 +52,7 @@ RUN apt-get update && apt-get install -y \
 
 
 # Clone polymetis repo and build from source with cmake options
-RUN git clone --recursive https://github.com/facebookresearch/fairo.git && \
+RUN git clone --recursive https://github.com/sanger640/fairo.git && \
     cd fairo/polymetis && conda env create -f ./polymetis/environment.yml && \
     conda run -n polymetis-local pip install -e ./polymetis
 
@@ -95,6 +95,13 @@ RUN git clone https://github.com/IntelRealSense/librealsense.git
 #     ./scripts/setup_udev_rules.sh
 RUN mkdir -p /etc/udev/rules.d 
 # RUN cd librealsense && ./scripts/setup_udev_rules.sh
+
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-dev \
+    libglu1-mesa-dev \
+    libglib2.0-0 \
+    freeglut3-dev
+
 RUN cd librealsense && \
     mkdir build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
@@ -108,8 +115,8 @@ RUN cd /opt/librealsense/build && \
     make install && ldconfig
 
 # Note: You may need to pip install pyrealsense2 bindings separately inside your conda env or system python
-# RUN conda run -n polymetis-local pip install pyrealsense2
-
+RUN conda run -n polymetis-local pip install pyrealsense2
+RUN conda run -n polymetis-local pip install opencv-python
 WORKDIR /app
 
 CMD ["/bin/bash"]

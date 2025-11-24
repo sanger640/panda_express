@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quest Robot Teleop</title>
+    <title>Quest Robot Teleop - Advanced</title>
     <style>
         body { 
             margin: 0; 
@@ -19,35 +19,33 @@
             top: 10px;
             left: 10px;
             color: white;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
             font-size: 14px;
             z-index: 100;
+            min-width: 250px;
         }
-        #enterVR {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 15px 30px;
-            font-size: 18px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+        .status-good { color: #00ff00; }
+        .status-bad { color: #ff0000; }
+        .status-warn { color: #ffaa00; }
     </style>
 </head>
 <body>
     <div id="info">
-        <div><strong>Quest Robot Teleoperation</strong></div>
-        <div>Status: <span id="status">Not Connected</span></div>
+        <div><strong>🤖 Quest Robot Teleoperation</strong></div>
+        <hr>
+        <div>Status: <span id="status" class="status-bad">Not Connected</span></div>
         <div>Position: <span id="position">-</span></div>
         <div>Trigger: <span id="trigger">0.0</span></div>
+        <div>Grip: <span id="grip">0.0</span></div>
+        <hr>
+        <div style="font-size: 12px;">
+            <div>🎮 Right Controller: Position/Rotation</div>
+            <div>🔫 Trigger: Gripper</div>
+            <div>✊ Grip: Toggle Recording</div>
+        </div>
     </div>
-    <button id="enterVR">Enter VR</button>
 
     <script type="importmap">
     {
@@ -65,9 +63,7 @@
 
         // ===== CONFIGURATION =====
         // REPLACE WITH YOUR COMPUTER'S LOCAL IP ADDRESS
-        // const WEBSOCKET_URL = 'wss://10.0.0.103:8765';
         const WEBSOCKET_URL = 'wss://129.97.71.84:8765';
-
         // =========================
 
         let scene, camera, renderer;
@@ -75,20 +71,20 @@
         let ws;
         let isConnected = false;
 
-        // Status display elements
+        // Status elements
         const statusEl = document.getElementById('status');
         const positionEl = document.getElementById('position');
         const triggerEl = document.getElementById('trigger');
+        const gripEl = document.getElementById('grip');
 
         init();
         animate();
 
         function init() {
-            // Create scene
+            // Scene setup
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x505050);
+            scene.background = new THREE.Color(0x303030);
 
-            // Create camera
             camera = new THREE.PerspectiveCamera(
                 50,
                 window.innerWidth / window.innerHeight,
@@ -97,67 +93,78 @@
             );
             camera.position.set(0, 1.6, 3);
 
-            // Add grid floor
-            const gridHelper = new THREE.GridHelper(10, 10);
+            // Environment
+            const gridHelper = new THREE.GridHelper(10, 20, 0x888888, 0x444444);
             scene.add(gridHelper);
 
-            // Add lighting
-            scene.add(new THREE.HemisphereLight(0xffffff, 0x444444));
-            const light = new THREE.DirectionalLight(0xffffff);
-            light.position.set(1, 1, 1);
-            scene.add(light);
+            // Lighting
+            scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 5);
+            scene.add(dirLight);
 
-            // Create renderer
+            // Add reference objects
+            const boxGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const boxMaterial = new THREE.MeshStandardMaterial({ color: 0xff6b6b });
+            const box = new THREE.Mesh(boxGeometry, boxMaterial);
+            box.position.set(0, 0.1, -1);
+            scene.add(box);
+
+            // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
+            renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // Replace the button with VRButton
-            document.getElementById('enterVR').remove();
+            // VR Button
             document.body.appendChild(VRButton.createButton(renderer));
 
-            // Setup controllers
+            // Controllers
             setupControllers();
 
-            // Connect WebSocket
+            // WebSocket
             connectWebSocket();
 
-            // Handle window resize
             window.addEventListener('resize', onWindowResize);
         }
 
         function setupControllers() {
             const controllerModelFactory = new XRControllerModelFactory();
 
-            // Controller 1 (right hand)
+            // Right controller
             controller1 = renderer.xr.getController(0);
-            controller1.addEventListener('selectstart', () => console.log('Controller 1 select'));
             scene.add(controller1);
 
-            const controllerGrip1 = renderer.xr.getControllerGrip(0);
-            controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
-            scene.add(controllerGrip1);
+            const grip1 = renderer.xr.getControllerGrip(0);
+            grip1.add(controllerModelFactory.createControllerModel(grip1));
+            scene.add(grip1);
 
-            // Add line to show controller direction
+            // Controller ray
             const geometry = new THREE.BufferGeometry().setFromPoints([
                 new THREE.Vector3(0, 0, 0),
                 new THREE.Vector3(0, 0, -1)
             ]);
-            const material = new THREE.LineBasicMaterial({ color: 0xffffff });
+            const material = new THREE.LineBasicMaterial({ 
+                color: 0x00ffff,
+                linewidth: 2
+            });
             const line = new THREE.Line(geometry, material);
-            line.scale.z = 5;
+            line.scale.z = 3;
             controller1.add(line.clone());
 
-            // Controller 2 (left hand)
+            // Left controller
             controller2 = renderer.xr.getController(1);
             scene.add(controller2);
 
-            const controllerGrip2 = renderer.xr.getControllerGrip(1);
-            controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
-            scene.add(controllerGrip2);
-            controller2.add(line.clone());
+            const grip2 = renderer.xr.getControllerGrip(1);
+            grip2.add(controllerModelFactory.createControllerModel(grip2));
+            scene.add(grip2);
+
+            const line2 = line.clone();
+            line2.material = new THREE.LineBasicMaterial({ color: 0xff00ff, linewidth: 2 });
+            controller2.add(line2);
         }
 
         function connectWebSocket() {
@@ -165,30 +172,28 @@
                 ws = new WebSocket(WEBSOCKET_URL);
 
                 ws.onopen = () => {
-                    console.log('WebSocket connected');
+                    console.log('✓ WebSocket connected');
                     statusEl.textContent = 'Connected';
-                    statusEl.style.color = '#00ff00';
+                    statusEl.className = 'status-good';
                     isConnected = true;
                 };
 
                 ws.onclose = () => {
-                    console.log('WebSocket disconnected');
+                    console.log('✗ WebSocket disconnected');
                     statusEl.textContent = 'Disconnected';
-                    statusEl.style.color = '#ff0000';
+                    statusEl.className = 'status-bad';
                     isConnected = false;
-
-                    // Attempt reconnection after 3 seconds
                     setTimeout(connectWebSocket, 3000);
                 };
 
                 ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    statusEl.textContent = 'Error';
-                    statusEl.style.color = '#ff0000';
+                    statusEl.textContent = 'Connection Error';
+                    statusEl.className = 'status-bad';
                 };
 
             } catch (error) {
-                console.error('Failed to connect:', error);
+                console.error('Failed to create WebSocket:', error);
                 setTimeout(connectWebSocket, 3000);
             }
         }
@@ -201,8 +206,8 @@
             const session = renderer.xr.getSession();
             if (!session) return;
 
-            // Get right controller (index 0)
-            session.inputSources.forEach((source, index) => {
+            // Find right controller
+            session.inputSources.forEach((source) => {
                 if (source.handedness === 'right' && source.gripSpace) {
                     const referenceSpace = renderer.xr.getReferenceSpace();
                     const frame = renderer.xr.getFrame();
@@ -214,24 +219,31 @@
                             const pos = pose.transform.position;
                             const orient = pose.transform.orientation;
 
-                            // Get trigger value
+                            // Button values
                             const triggerValue = source.gamepad?.buttons[0]?.value || 0;
+                            const gripValue = source.gamepad?.buttons[1]?.value || 0;
 
                             const data = {
                                 position: [pos.x, pos.y, pos.z],
                                 orientation: [orient.x, orient.y, orient.z, orient.w],
-                                trigger: triggerValue
+                                trigger: triggerValue,
+                                grip: gripValue
                             };
 
-                            // Send to server
                             try {
                                 ws.send(JSON.stringify(data));
 
-                                // Update display
-                                positionEl.textContent = `${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}`;
+                                // Update UI
+                                positionEl.textContent = `${pos.x.toFixed(3)}, ${pos.y.toFixed(3)}, ${pos.z.toFixed(3)}`;
                                 triggerEl.textContent = triggerValue.toFixed(2);
+                                gripEl.textContent = gripValue.toFixed(2);
+
+                                // Visual feedback for buttons
+                                triggerEl.style.color = triggerValue > 0.5 ? '#00ff00' : '#ffffff';
+                                gripEl.style.color = gripValue > 0.5 ? '#ffaa00' : '#ffffff';
+
                             } catch (e) {
-                                console.error('Failed to send data:', e);
+                                console.error('Send failed:', e);
                             }
                         }
                     }
