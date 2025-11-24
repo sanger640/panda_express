@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  app:
+    network_mode: "host"
+    privileged: true
+    devices:
+      - "/dev/video0:/dev/video0"
+      - "/dev/video1:/dev/video1"
+      - "/dev/bus/usb:/dev/bus/usb"
+    cap_add:
+      - SYS_NICE
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    build: 
+      context: .
+      args:
+        LIBFRANKA_VERSION: 0.8.0 # specify tag or commit hash if needed
+        INSTALL_CUDA: "false" # set to "true" to install CUDA PyTorch 
+    volumes:
+      - ./:/app
+      - /tmp:/tmp
+      - /dev:/dev
+      - /var/run:/var/run
+      - /sys:/sys:rw
+    environment:
+      - DISPLAY=${DISPLAY}
+    working_dir: /app
+    tty: true
+    command: /bin/bash

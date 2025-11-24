@@ -12,8 +12,6 @@ WORKSPACE_RADIUS = 0.3   # max(m), adjust to your robot
 WORKSPACE_MIN_Z = 0.08   # min z for tabletop
 ROBOT_BASE = np.array([0.0, 0.0, 0.0])  # or your base frame
 
-
-
 class AdvancedQuestRobotTeleop:
     """Advanced teleoperation with position AND orientation control"""
 
@@ -25,8 +23,8 @@ class AdvancedQuestRobotTeleop:
         self.enable_orientation = enable_orientation
 
         # Start impedance controller
-        Kx = torch.Tensor([150., 150., 150., 10., 10., 10.])
-        Kxd = torch.Tensor([10., 10., 10., 1., 1., 1.])
+        Kx = torch.Tensor([750, 750, 750, 15, 15, 15])
+        Kxd = torch.Tensor([37, 37, 37, 2, 2, 2])
         self.robot.start_cartesian_impedance(Kx=Kx, Kxd=Kxd)
 
         print("Robot impedance controller started!")
@@ -44,8 +42,8 @@ class AdvancedQuestRobotTeleop:
         self.prev_target_pos = None
 
         # Control parameters
-        self.position_scale = 1.0
-        self.rotation_scale = 1.0
+        self.position_scale = 0.005
+        self.rotation_scale = 0.005
 
         # Recording
         self.recording = False
@@ -55,20 +53,22 @@ class AdvancedQuestRobotTeleop:
         # Gripper state
         self.last_gripper_closed = False
 
+        # Store controller gains for restarts
+        self.Kx = Kx
+        self.Kxd = Kxd
+
     def transform_controller_to_robot(self, pos):
-        # pos: numpy array [X_c, Y_c, Z_c] from controller
-        # output: [X_r, Y_r, Z_r] for robot
-        # Map: Robot X = Controller Z, Robot Y = Controller X, Robot Z = Controller Y
+        # Map: Robot X = -Controller Z, Robot Y = -Controller X, Robot Z = Controller Y
         return np.array([-pos[2], -pos[0], pos[1]])
     
     def transform_controller_quat(self, q):
         # Input: [x, y, z, w] (controller)
-        # Output: [z, x, y, w] (robot) -- swap as in position
+        # Output: [z, x, y, w] (robot) with axis swap and sign flips
         return np.array([-q[2], -q[0], q[1], q[3]])
 
     def calibrate(self, controller_pos, controller_quat):
         """Calibrate coordinate systems"""
-        self.initial_controller_pos = controller_pos
+        self.initial_controller_pos = self.transform_controller_to_robot(controller_pos)
         self.initial_controller_rot = R.from_quat(self.transform_controller_quat(controller_quat))
         self.initial_robot_rot = R.from_quat(self.initial_robot_quat.numpy())
         self.calibrated = True
@@ -92,7 +92,6 @@ class AdvancedQuestRobotTeleop:
 
                 # Extract controller data
                 controller_pos = np.array(data['position'])
-                
                 controller_quat = np.array(data['orientation'])
                 print(controller_quat)
                 trigger_value = data.get('trigger', 0.0)
@@ -105,34 +104,36 @@ class AdvancedQuestRobotTeleop:
 
                 # === POSITION CONTROL ===
                 controller_pos_robot = self.transform_controller_to_robot(controller_pos)
-                pos_delta = (controller_pos_robot - self.transform_controller_to_robot(self.initial_controller_pos)) * self.position_scale
+                pos_delta = (controller_pos_robot - self.initial_controller_pos) * self.position_scale
                 target_pos = self.initial_robot_pos.numpy() + pos_delta
 
+                # Apply low-pass filter for smoothing
+                alpha = 0.1
+                if self.prev_target_pos is not None:
+                    target_pos = alpha * target_pos + (1 - alpha) * self.prev_target_pos
 
+                # Safeguard: Clamp too large position step
                 step = np.linalg.norm(target_pos - self.prev_target_pos)
                 if step > MAX_POSITION_STEP:
-                    # Clamp to allowed step in the direction of the desired move
                     direction = (target_pos - self.prev_target_pos) / step
                     target_pos = self.prev_target_pos + direction * MAX_POSITION_STEP
                     print(f"[SAFEGUARD] Position step too large ({step:.3f} m), clamped.")
-                
-                # Check workspace and clamp if needed:
+
+                # Safeguard: Clamp workspace boundaries
                 vec_from_base = target_pos - ROBOT_BASE
                 norm_dist = np.linalg.norm(vec_from_base)
                 if norm_dist > WORKSPACE_RADIUS:
-                    target_pos = ROBOT_BASE + vec_from_base / norm_dist * WORKSPACE_RADIUS
+                    target_pos = ROBOT_BASE + (vec_from_base / norm_dist) * WORKSPACE_RADIUS
                     print("[SAFEGUARD] Target outside workspace sphere, clamped.")
                 if target_pos[2] < WORKSPACE_MIN_Z:
                     target_pos[2] = WORKSPACE_MIN_Z
                     print("[SAFEGUARD] Target z below table, clamped.")
 
                 self.prev_target_pos = target_pos.copy()
-
                 target_pos_tensor = torch.Tensor(target_pos)
 
                 # === ORIENTATION CONTROL ===
                 if self.enable_orientation:
-                    # Calculate rotation delta
                     current_controller_rot = R.from_quat(self.transform_controller_quat(controller_quat))
                     delta_rot = current_controller_rot * self.initial_controller_rot.inv()
                     target_rot = delta_rot * self.initial_robot_rot
@@ -141,11 +142,23 @@ class AdvancedQuestRobotTeleop:
                 else:
                     target_quat_tensor = self.initial_robot_quat
 
-                # Update robot pose
-                self.robot.update_desired_ee_pose(
-                    position=target_pos_tensor,
-                    orientation=target_quat_tensor
-                )
+                # === Update robot pose - try with controller restart if fails ===
+                try:
+                    self.robot.update_desired_ee_pose(
+                        position=target_pos_tensor,
+                        orientation=target_quat_tensor
+                    )
+                except Exception as e:
+                    # Check for controller not running error and restart
+                    if "no controller running" in str(e):
+                        print("Controller error detected, restarting Cartesian impedance controller.")
+                        self.robot.start_cartesian_impedance(Kx=self.Kx, Kxd=self.Kxd)
+                        self.robot.update_desired_ee_pose(
+                            position=target_pos_tensor,
+                            orientation=target_quat_tensor
+                        )
+                    else:
+                        raise e
 
                 # === GRIPPER CONTROL ===
                 gripper_closed = trigger_value > 0.5
@@ -154,7 +167,6 @@ class AdvancedQuestRobotTeleop:
                     self.last_gripper_closed = gripper_closed
 
                 # === RECORDING ===
-                # Press grip button to toggle recording
                 if grip_button > 0.5 and not hasattr(self, '_grip_pressed'):
                     self._grip_pressed = True
                     self.toggle_recording()
@@ -244,13 +256,8 @@ ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
 async def main():
     # Set enable_orientation=True to control both position and orientation
     # Set enable_orientation=False for position-only control
-    teleop = AdvancedQuestRobotTeleop(enable_orientation=True)
+    teleop = AdvancedQuestRobotTeleop(enable_orientation=False)
 
-    # try:
-    #     await teleop.start_server()
-    # except KeyboardInterrupt:
-    #     teleop.cleanup()
-    # robot ip
     async with websockets.serve(teleop.handle_controller_data, '0.0.0.0', 8765, ssl=ssl_context):
         print('WSS server running on port 8765')
         await asyncio.Future()

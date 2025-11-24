@@ -12,8 +12,8 @@ class QuestRobotTeleop:
         self.robot = RobotInterface(ip_address="localhost", port=50051)
 
         # Start impedance controller with soft compliance
-        Kx = torch.Tensor([150., 150., 150., 10., 10., 10.])
-        Kxd = torch.Tensor([10., 10., 10., 1., 1., 1.])
+        Kx = torch.Tensor([100., 100., 100., 5., 5., 5.])
+        Kxd = torch.Tensor([5., 5., 5., 1., 1., 1.])
         self.robot.start_cartesian_impedance(Kx=Kx, Kxd=Kxd)
 
         print("Robot impedance controller started!")
