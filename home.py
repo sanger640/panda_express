@@ -11,15 +11,11 @@ def main():
         0.04004822298884392,
         0.035469427704811096])  # Quaternion (x,y,z,w)
 
-    # Set target EE pose
     robot.set_ee_pose(target_position, target_orientation)
-
-    # Run control loop until target reached or timeout
-    # for _ in range(1000):
-    #     robot.step()  # send control commands
-    # robot.disconnect()
 
     gripper.stop()
     gripper.goto(width=0.25, speed=0.05, force=0.1)
+
+
 if __name__ == "__main__":
     main()
