@@ -128,14 +128,11 @@ ls /mnt/ssd_data
 
 
 ## To Do:
-- camera setup (zoom in better positioning); external calibration?
-    - calibration needed for the output
-        - you output ee pose in robot frame
-        - before training, convert it to camera frame
-        - can move the camera to new pose as well and should be relatively fine (still have to double check)
+- Implement Camera Calibration: When recording demonstration high chance camera can be moved, so policy trained on uncalibrated cameras are very brittle. Best to implement camera calibration (and recording the calibration values every waypoint) to make the policy robust to accidental (or intentional) camera pose changes.
+- Using tactile sensing to train diffusion policies.
 
 ## Done
-- update gripper to implement blocking stop command: https://github.com/facebookresearch/fairo/pull/1417/files
+- Update gripper to implement blocking stop command: https://github.com/facebookresearch/fairo/pull/1417/files
     - fork and update and then only clone that in docker
 - dual camera setup
     - 2 fixed
