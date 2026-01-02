@@ -9,7 +9,7 @@ This repository implements the following functionalities:
 There is a Dockerfile provided (along with docker compose) to setup the enviornment to run the scripts.
 This repository utilizes [Polymetis](https://github.com/facebookresearch/fairo/tree/main/polymetis) send realtime cartesian commands to the Franka Robot.
 
-<div style="display: flex; justify-content: space-around;">
+<div align="center">
   <img src="assets/trials.gif" width="48%" />
   <img src="assets/trials_move_cup.gif" width="48%" />
   <p><i>Diffusion Policy in action</i></p>
@@ -86,7 +86,7 @@ https://129.97.71.84:8443/quest_controller.html
 ```
 
 <div align="center">
-  <img src="https://github.com/sanger640/panda_express/blob/master/assets/diff_policy_setup.jpg?raw=true" width="400">
+  <img src="assets/teleop_demo.gif" width="400">
   <p><i>Teleop Demonstration</i></p>
 </div>
 
