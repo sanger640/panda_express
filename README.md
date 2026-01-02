@@ -10,8 +10,9 @@ There is a Dockerfile provided (along with docker compose) to setup the enviornm
 This repository utilizes [Polymetis](https://github.com/facebookresearch/fairo/tree/main/polymetis) send realtime cartesian commands to the Franka Robot.
 
 <div style="display: flex; justify-content: space-around;">
-  <img src="assets/diff_policy_dual_1.mp4" width="48%" />
-  <img src="assets/diff_policy_dual_2.mp4" width="48%" />
+  <img src="assets/trials.gif" width="48%" />
+  <img src="assets/trials.gif" width="48%" />
+  <p><i>Diffusion Policy in action</i></p>
 </div>
 
 ## Hardware Setup
@@ -83,6 +84,11 @@ python quest_teleop4.py
 ```bash
 https://129.97.71.84:8443/quest_controller.html
 ```
+
+<div align="center">
+  <img src="https://github.com/sanger640/panda_express/blob/master/assets/diff_policy_setup.jpg?raw=true" width="400">
+  <p><i>Teleop Demonstration</i></p>
+</div>
 
 ### Recording Demonstrations (only need right hand controller)
 
