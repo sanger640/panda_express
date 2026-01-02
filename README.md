@@ -20,6 +20,11 @@ This repository utilizes [Polymetis](https://github.com/facebookresearch/fairo/t
     - 1 External Camera: D435 Realsense
     - 1 Wrist Camera: D435 Realsense
 
+<div align="center">
+  <img src="https://github.com/sanger640/panda_express/blob/master/assets/diff_policy_setup.jpg?raw=true" width="400">
+  <p><i>Franka Panda Robot Setup</i></p>
+</div>
+
 ## Episode Format
 - The epsiodes are recorded in the following format.
 - All the epsiodes are stored within `episodes/` directory.
