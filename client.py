@@ -5,15 +5,15 @@ from franka import Franka
 from cam import DualRealSense
 
 # --- CONFIGURATION ---
-GPU_SERVER_IP = "129.97.71.51" # UPDATE THIS
+GPU_SERVER_IP = "129.97.71.51" 
 PORT = 5555
 ROBOT_IP = "129.97.71.27"
 
-# SERIAL NUMBERS (Must match training order!)
+# SERIAL NUMBERS (Must match training order)
 CAM1_SERIAL = "215222078938" 
 CAM2_SERIAL = "819612070440"
 
-# Hardware Config
+
 IMG_W, IMG_H = 320, 240
 CONTROL_HZ = 10
 # ---------------------
@@ -29,7 +29,7 @@ def main():
 
 
     obs_buffer = deque(maxlen=2)
-    
+
     try:
         while True:
             loop_start = time.time()

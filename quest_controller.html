@@ -33,7 +33,7 @@
 </head>
 <body>
     <div id="info">
-        <div><strong>🤖 Quest Robot Teleoperation</strong></div>
+        <div><strong>Quest Robot Teleoperation</strong></div>
         <hr>
         <div>Status: <span id="status" class="status-bad">Not Connected</span></div>
         <div>Position: <span id="position">-</span></div>
@@ -43,11 +43,11 @@
         <div>Button B: <span id="btn-b">0</span></div>
         <hr>
         <div style="font-size: 12px;">
-            <div>🎮 Right Controller: Position/Rotation</div>
-            <div>🔫 Trigger: Gripper</div>
-            <div>✊ Grip: Toggle Recording</div>
-            <div>🅰️ Button A: Aux 1</div>
-            <div>🅱️ Button B: Aux 2</div>
+            <div>Right Controller: Position/Rotation</div>
+            <div>Trigger: Gripper</div>
+            <div>Grip: Toggle Recording</div>
+            <div>Button A: Aux 1</div>
+            <div>Button B: Aux 2</div>
         </div>
     </div>
 
@@ -178,14 +178,14 @@
                 ws = new WebSocket(WEBSOCKET_URL);
 
                 ws.onopen = () => {
-                    console.log('✓ WebSocket connected');
+                    console.log('WebSocket connected');
                     statusEl.textContent = 'Connected';
                     statusEl.className = 'status-good';
                     isConnected = true;
                 };
 
                 ws.onclose = () => {
-                    console.log('✗ WebSocket disconnected');
+                    console.log('WebSocket disconnected');
                     statusEl.textContent = 'Disconnected';
                     statusEl.className = 'status-bad';
                     isConnected = false;
