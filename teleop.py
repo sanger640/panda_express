@@ -209,8 +209,24 @@ class Teleop:
                 self.gripper.goto(width=0.25, speed=0.05, force=0.1)
             self.last_gripper_closed = gripper_closed
 
-    def recording(self):
-        pass
+    def recording(self, grip_button):
+        # check whether to start or stop rec
+        if grip_button > 0.5 and not self._grip_pressed:
+            self._grip_pressed = True
+            self.recording = True
+            self.trajectory_data = []
+            self.record_start_time = time.time()
+            self.recorder.start()
+            print(f"Grip pressed. Starting recording. Episode {self.i}/{self.recorder.i}")
+        elif grip_button <= 0.5 and self._grip_pressed:
+            self._grip_pressed = False
+            self.recording = False
+            self.save_trajectory()
+            self.recorder.stop()
+            self.recorder.i += 1
+            self.recorder.save_folder = SSD_LOC+"episodes/" + str(self.i) + "/rgb_frames/"
+            os.makedirs(self.recorder.save_folder, exist_ok=True)
+            print(f"RECORDING STOPPED ({len(self.trajectory_data)} waypoints)")
 
     
     def record_waypoint(self, position, orientation, gripper):
@@ -297,25 +313,6 @@ class Teleop:
                     # Gripper control
                     self.gripper_action(trigger_value)
                     self.recording(grip_button)
-
-                    # Recording control (use diff button name, create a func)
-                    # check whether to start or stop rec
-                    if grip_button > 0.5 and not self._grip_pressed:
-                        self._grip_pressed = True
-                        self.recording = True
-                        self.trajectory_data = []
-                        self.record_start_time = time.time()
-                        self.recorder.start()
-                        print(f"Grip pressed. Starting recording. Episode {self.i}/{self.recorder.i}")
-                    elif grip_button <= 0.5 and self._grip_pressed:
-                        self._grip_pressed = False
-                        self.recording = False
-                        self.save_trajectory()
-                        self.recorder.stop()
-                        self.recorder.i += 1
-                        self.recorder.save_folder = SSD_LOC+"episodes/" + str(self.i) + "/rgb_frames/"
-                        os.makedirs(self.recorder.save_folder, exist_ok=True)
-                        print(f"RECORDING STOPPED ({len(self.trajectory_data)} waypoints)")
 
                     if self.recording:
                         # record waypoints
