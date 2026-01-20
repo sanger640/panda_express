@@ -77,7 +77,7 @@ python host_server.py
 - Terminal 4 : Run the teleop script which listens to the Meta Controller commands (controller pose + button commands) and outputs robot cartesian pose commands, gripper commands (open/close) and whether to start/end recording of a given demonstration (episode). 
 ```bash
 python home.py # to reset the robot to a determined home pose
-python quest_teleop_dual.py
+python teleop.py
 ```
 
 - Connect to the hosted server on the Meta Quest Pro Browser and enter VR mode.
@@ -132,7 +132,7 @@ sudo ntfsfix /dev/sda1
 ```
 - Then mount on `/mnt/`
 ```bash
-sudo mount /dev/sdb1 /mnt/ssd_data
+sudo mount /dev/sda1 /mnt/ssd_data
 ls /mnt/ssd_data
 ```
 - Then attach to docker compose (already done)
@@ -146,8 +146,15 @@ ls /mnt/ssd_data
 ## To Do:
 - Implement Camera Calibration: When recording demonstration high chance camera can be moved, so policy trained on uncalibrated cameras are very brittle. Best to implement camera calibration (and recording the calibration values every waypoint) to make the policy robust to accidental (or intentional) camera pose changes.
 - Using tactile sensing to train diffusion policies.
+- Check refactored code: franka.py, client.py
+- Refactor the host server part
+- Jenga blocks task store
+- Add to website
+
 
 ## Done
+- Teleop w/ orientation works (can remove the deadband for that, dont feel its needed)
+- Checked out teleop.py, cam.py functionality.
 - Update gripper to implement blocking stop command: https://github.com/facebookresearch/fairo/pull/1417/files
     - fork and update and then only clone that in docker
 - dual camera setup

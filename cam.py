@@ -3,6 +3,8 @@ import cv2
 import pyrealsense2 as rs
 import threading
 import queue
+import os
+import time
 
 class DualRealSense:
     def __init__(self, cam1_serial, cam2_serial, H, W, hz):
@@ -49,7 +51,7 @@ class DualRealSense:
         return i1, i2
 
 class DualRealsenseRecorder:
-    def __init__(self, i=0, cam1_serial, cam2_serial, ssd_loc):
+    def __init__(self, i, cam1_serial, cam2_serial, ssd_loc):
         self.i = i
         self.cam1_serial = cam1_serial
         self.cam2_serial = cam2_serial

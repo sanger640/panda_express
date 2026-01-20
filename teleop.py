@@ -20,10 +20,10 @@ WORKSPACE_RADIUS = 0.25    # slightly smaller workspace
 WORKSPACE_MIN_Z = 0.08
 ROBOT_BASE = np.array([0.0, 0.0, 0.0])
 
-CAMERA_1_SERIAL = "215222078938" 
-CAMERA_2_SERIAL = "819612070440"
+CAM1_SERIAL = "215222078938" 
+CAM2_SERIAL = "819612070440"
 ROBOT_IP = "129.97.71.27"
-SSD_LOC="/mnt/diffusion_policy/tasks/pick_place/dual_wrist/"
+SSD_LOC="/mnt/diffusion_policy/tasks/pick_place/dual_wrist/test_task/"
 # ---------------------
 
 class Teleop:
@@ -81,6 +81,7 @@ class Teleop:
 
         # gripper state (initially open)
         self.last_gripper_closed = False
+        self.gripper_closed = False
 
         # episode number to record from (and init recorder)
         self.i = 1
@@ -152,7 +153,7 @@ class Teleop:
             if angle < self.DEADBAND_ORI_RAD and self.prev_target_quat is not None:
                 target_quat = self.prev_target_quat.copy()
             else:
-                target_rot = delta_rot * self.initial_robot_rot
+                target_rot = delta_rot * R.from_quat(self.prev_target_quat)
                 target_quat = target_rot.as_quat()
             
             self.prev_target_quat = target_quat.copy()
@@ -197,19 +198,19 @@ class Teleop:
                 raise e
 
     def gripper_action(self, trigger_value):
-        gripper_closed = trigger_value > 0.5
+        self.gripper_closed = trigger_value > 0.5
         # see if grip val diff then last timestep
-        if gripper_closed != self.last_gripper_closed:
-            if gripper_closed:
+        if self.gripper_closed != self.last_gripper_closed:
+            if self.gripper_closed:
                 print("Gripper Closed")
                 self.gripper.grasp(speed=0.05, force=0.1)
             else:
                 print("Gripper Open")
                 self.gripper.stop() # if was closing, stop it and open
                 self.gripper.goto(width=0.25, speed=0.05, force=0.1)
-            self.last_gripper_closed = gripper_closed
+            self.last_gripper_closed = self.gripper_closed
 
-    def recording(self, grip_button):
+    def rec(self, grip_button):
         # check whether to start or stop rec
         if grip_button > 0.5 and not self._grip_pressed:
             self._grip_pressed = True
@@ -243,7 +244,7 @@ class Teleop:
             print("No data")
             return
 
-        filename = f"{SSD_LOC}episodes/{self.i}/trajectory_{int(_time.time())}.json"
+        filename = f"{SSD_LOC}episodes/{self.i}/trajectory_{int(time.time())}.json"
 
         trajectory = {
             'metadata': {
@@ -293,7 +294,7 @@ class Teleop:
                         self.calibrate(controller_pos, controller_quat)
                         continue
 
-                    target_pos, target_quat = self.deadband(controller_pos)
+                    target_pos, target_quat = self.deadband(controller_pos, controller_quat)
                     
                     # deadband on ee target pos (not needed i think); need prev target pos
                     # if self.prev_target_pos is not None:
@@ -312,14 +313,14 @@ class Teleop:
                     
                     # Gripper control
                     self.gripper_action(trigger_value)
-                    self.recording(grip_button)
+                    self.rec(grip_button)
 
                     if self.recording:
                         # record waypoints
                         if self.enable_orientation:
-                            self.record_waypoint(target_pos_tensor, target_quat_tensor, gripper_closed)
+                            self.record_waypoint(target_pos_tensor, target_quat_tensor, self.gripper_closed)
                         else:
-                            self.record_waypoint(target_pos_tensor, self.initial_robot_quat, gripper_closed)
+                            self.record_waypoint(target_pos_tensor, self.initial_robot_quat, self.gripper_closed)
 
             except json.JSONDecodeError as e:
                 print(f"JSON decode error: {e}")
