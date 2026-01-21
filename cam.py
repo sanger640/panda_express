@@ -71,18 +71,21 @@ class DualRealsenseRecorder:
         self.config2.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
         self.frame_queue = queue.Queue(maxsize=2000)
+        self.img1 = None
+        self.img2 = None
+        try:
+            self.pipeline1.start(self.config1)
+            print(f"Camera 1 ({self.cam1_serial}) started.")
+            self.pipeline2.start(self.config2)
+            print(f"Camera 2 ({self.cam2_serial}) started.")
+        except RuntimeError as e:
+            print(f"Error starting cameras: {e}")
+            return
+        self.stream_thread = threading.Thread(target=self._stream, daemon=True)
+        self.stream_thread.start()
 
     def start(self):
         if not self.running:
-            try:
-                self.pipeline1.start(self.config1)
-                print(f"Camera 1 ({self.cam1_serial}) started.")
-                self.pipeline2.start(self.config2)
-                print(f"Camera 2 ({self.cam2_serial}) started.")
-            except RuntimeError as e:
-                print(f"Error starting cameras: {e}")
-                return
-
             self.running = True
             
             # thread for capturing frame
@@ -92,26 +95,49 @@ class DualRealsenseRecorder:
             # thread for saving to disk
             self.save_thread = threading.Thread(target=self._save_worker, daemon=True)
             self.save_thread.start()
-    
+
+    def start_stream(self):
+        self.stream_thread = threading.Thread(target=self._stream, daemon=True)
+        self.stream_thread.start()
+        print("Camera Straming")
+
+    def show_preview(self, is_recording=False):
+        # Peek at the queue for the latest frame
+        try:            
+            # Create side-by-side view
+            combined = np.hstack((self.img1, self.img2))
+            
+            # Add visual feedback if recording
+            # if is_recording:
+            #     cv2.putText(combined, "● RECORDING", (20, 40), 
+            #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            
+            cv2.imshow("Camera Preview", combined)
+            cv2.waitKey(1)
+        except Exception:
+            pass # Prevent crashes if queue is modified during peek
+
+    def _stream(self):
+        while True:
+            frames1 = self.pipeline1.wait_for_frames()
+            frames2 = self.pipeline2.wait_for_frames()
+
+            color_frame1 = frames1.get_color_frame()
+            color_frame2 = frames2.get_color_frame()
+            self.img1 = np.asanyarray(color_frame1.get_data())
+            self.img2 = np.asanyarray(color_frame2.get_data())
+            self.timestamp = time.time()
+
     def _capture_worker(self):
         while self.running:
             # sync frames
-            frames1 = self.pipeline1.wait_for_frames()
-            frames2 = self.pipeline2.wait_for_frames()
             
-            color_frame1 = frames1.get_color_frame()
-            color_frame2 = frames2.get_color_frame()
-            
-            if not color_frame1 or not color_frame2:
+            if not self.img1 or not self.img2:
                 continue
-            
-            img1 = np.asanyarray(color_frame1.get_data())
-            img2 = np.asanyarray(color_frame2.get_data())
-            timestamp = time.time()
             
             try:
                 # add both to queue
-                self.frame_queue.put_nowait((timestamp, img1, img2))
+                self.frame_queue.put_nowait((self.timestamp, self.img1, self.img2))
             except queue.Full:
                 pass # drop if queue full (should not happen, queue big enough)
 
@@ -139,9 +165,9 @@ class DualRealsenseRecorder:
         if hasattr(self, 'save_thread'):
             self.save_thread.join()
         
-        try:
-            self.pipeline1.stop()
-            self.pipeline2.stop()
-        except:
-            pass
+        # try:
+        #     self.pipeline1.stop()
+        #     self.pipeline2.stop()
+        # except:
+        #     pass
         print("Cameras stopped.")

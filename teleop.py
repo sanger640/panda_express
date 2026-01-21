@@ -260,6 +260,8 @@ class Teleop:
 
         print(f"Saved trajectory to: {filename}")
         self.i +=1
+    
+    
 
     async def handle_controller_data(self, websocket):
         """Process incoming controller data"""
@@ -274,7 +276,7 @@ class Teleop:
                 if now - self.last_command_time < self.command_period:
                     continue
                 self.last_command_time = now
-
+                self.recorder.show_preview(is_recording=self.recording)
                 data = json.loads(message)
 
                 # get data from controller
