@@ -23,7 +23,7 @@ ROBOT_BASE = np.array([0.0, 0.0, 0.0])
 CAM1_SERIAL = "215222078938" 
 CAM2_SERIAL = "819612070440"
 ROBOT_IP = "129.97.71.27"
-SSD_LOC="/mnt/diffusion_policy/tasks/pick_place/dual_wrist/test_task/"
+SSD_LOC="/mnt/diffusion_policy/tasks/pick_place/dual_wrist/world_model/"
 # ---------------------
 
 class Teleop:
@@ -84,7 +84,7 @@ class Teleop:
         self.gripper_closed = False
 
         # episode number to record from (and init recorder)
-        self.i = 1
+        self.i = 48
         self.recorder = DualRealsenseRecorder(self.i, CAM1_SERIAL, CAM2_SERIAL, SSD_LOC)
 
         # dont track controller at start

@@ -71,8 +71,8 @@ class DualRealsenseRecorder:
         self.config2.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
         self.frame_queue = queue.Queue(maxsize=2000)
-        self.img1 = None
-        self.img2 = None
+        self.lock = threading.Lock()
+        self.preview_frame = None
         try:
             self.pipeline1.start(self.config1)
             print(f"Camera 1 ({self.cam1_serial}) started.")
@@ -81,8 +81,7 @@ class DualRealsenseRecorder:
         except RuntimeError as e:
             print(f"Error starting cameras: {e}")
             return
-        self.stream_thread = threading.Thread(target=self._stream, daemon=True)
-        self.stream_thread.start()
+
 
     def start(self):
         if not self.running:
@@ -103,43 +102,54 @@ class DualRealsenseRecorder:
 
     def show_preview(self, is_recording=False):
         # Peek at the queue for the latest frame
-        try:            
-            # Create side-by-side view
-            combined = np.hstack((self.img1, self.img2))
-            
-            # Add visual feedback if recording
-            # if is_recording:
-            #     cv2.putText(combined, "● RECORDING", (20, 40), 
-            #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            
-            cv2.imshow("Camera Preview", combined)
-            cv2.waitKey(1)
-        except Exception:
-            pass # Prevent crashes if queue is modified during peek
+        if self.running:
+            try:            
+                # Create side-by-side view
+                # Add visual feedback if recording
+                # if is_recording:
+                #     cv2.putText(combined, "● RECORDING", (20, 40), 
+                #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                
+                cv2.imshow("Camera Preview", self.preview_frame)
+                cv2.waitKey(1)
+            except Exception:
+                pass # Prevent crashes if queue is modified during peek
 
-    def _stream(self):
-        while True:
-            frames1 = self.pipeline1.wait_for_frames()
-            frames2 = self.pipeline2.wait_for_frames()
+    # def _stream(self):
+    #     while True:
+    #         frames1 = self.pipeline1.wait_for_frames()
+    #         frames2 = self.pipeline2.wait_for_frames()
 
-            color_frame1 = frames1.get_color_frame()
-            color_frame2 = frames2.get_color_frame()
-            self.img1 = np.asanyarray(color_frame1.get_data())
-            self.img2 = np.asanyarray(color_frame2.get_data())
-            self.timestamp = time.time()
+    #         color_frame1 = frames1.get_color_frame()
+    #         color_frame2 = frames2.get_color_frame()
+    #         with self.lock:
+    #             self.img1 = np.asanyarray(color_frame1.get_data())
+    #             self.img2 = np.asanyarray(color_frame2.get_data())
+    #             self.timestamp = time.time()
 
     def _capture_worker(self):
         while self.running:
-            # sync frames
+            f1 = self.pipeline1.wait_for_frames()
+            f2 = self.pipeline2.wait_for_frames()
             
-            if not self.img1 or not self.img2:
-                continue
+            c1 = f1.get_color_frame()
+            c2 = f2.get_color_frame()
             
+            if not c1 or not c2: continue
+
+            img1 = np.asanyarray(c1.get_data())
+            img2 = np.asanyarray(c2.get_data())
+            ts = time.time()
+
+            # Update the preview frame safely
+            # We stack them here so the UI thread doesn't have to do work
+            # with self.lock:
+            self.preview_frame = np.hstack((img1, img2))
+
             try:
-                # add both to queue
-                self.frame_queue.put_nowait((self.timestamp, self.img1, self.img2))
+                self.frame_queue.put_nowait((ts, img1, img2))
             except queue.Full:
-                pass # drop if queue full (should not happen, queue big enough)
+                pass
 
     def _save_worker(self):
         while self.running or not self.frame_queue.empty():
