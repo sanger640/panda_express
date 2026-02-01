@@ -97,6 +97,7 @@ RUN conda run -n polymetis-local pip install pyrealsense2
 RUN conda run -n polymetis-local pip install opencv-python
 RUN conda run -n polymetis-local pip install pyzmq
 RUN conda run -n polymetis-local pip install websockets
+RUN conda run -n polymetis-local pip install mujoco
 
 
 WORKDIR /app

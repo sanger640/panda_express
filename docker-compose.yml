@@ -7,6 +7,8 @@ services:
       - "/dev/video0:/dev/video0"
       - "/dev/video1:/dev/video1"
       - "/dev/bus/usb:/dev/bus/usb"
+      - /dev/dxg:/dev/dxg                   # WSL GPU device
+
     cap_add:
       - SYS_NICE
     ulimits:
@@ -25,8 +27,31 @@ services:
       - /var/run:/var/run
       - /sys:/sys:rw
       - /mnt/ssd_data/diffusion_policy:/mnt/diffusion_policy
+
+      - /tmp/.X11-unix:/tmp/.X11-unix       # X11 server
+      - /mnt/wslg:/mnt/wslg                 # WSLg mount
+      - /usr/lib/wsl:/usr/lib/wsl           # WSL GPU libraries
     environment:
       - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+
+      - QT_X11_NO_MITSHM=1
+      
+      # **Official Microsoft WSLg GPU environment variables**
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+      - PULSE_SERVER=${PULSE_SERVER}
+      - LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              # 'graphics' and 'display' are crucial for MuJoCo rendering
+              capabilities: [gpu, graphics, video, display, utility, compute]
     working_dir: /app
     tty: true
     command: /bin/bash
