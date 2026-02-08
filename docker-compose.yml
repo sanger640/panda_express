@@ -26,7 +26,9 @@ services:
       - /dev:/dev
       - /var/run:/var/run
       - /sys:/sys:rw
-      - /mnt/ssd_data/diffusion_policy:/mnt/diffusion_policy
+      # - /mnt/ssd_data/diffusion_policy:/mnt/diffusion_policy
+      # - /mnt/d/diffusion_policy:/mnt/diffusion_policy
+
 
       - /tmp/.X11-unix:/tmp/.X11-unix       # X11 server
       - /mnt/wslg:/mnt/wslg                 # WSLg mount

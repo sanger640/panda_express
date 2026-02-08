@@ -25,40 +25,49 @@
             mass="1000" contype="1" conaffinity="1"/>
     </body>
 
-    <body name="block_middle" pos="0.5 0.0 0.875">
+    <body name="block_middle" pos="0 0 0">
       <joint type="free"/>
-      <geom size="0.0125 0.0125 0.0375" type="box" rgba="0.9 0.1 0.1 1" mass="0.05"/>
+      <geom size="0.0125 0.01 0.0375" type="box" rgba="0.9 0.1 0.1 1" mass="0.05"/>
     </body>
-    <body name="block_left" pos="0.5 -0.04 0.875">
+    <body name="block_left" pos="0 0 0">
       <joint type="free"/>
-      <geom size="0.0125 0.0125 0.0375" type="box" material="block_mat" mass="0.05"/>
+      <geom size="0.0125 0.01 0.0375" type="box" material="block_mat" mass="0.05"/>
     </body>
-    <body name="block_right" pos="0.5 0.04 0.875">
+    <body name="block_right" pos="0 0 0">
       <joint type="free"/>
-      <geom size="0.0125 0.0125 0.0375" type="box" material="block_mat" mass="0.05"/>
+      <geom size="0.0125 0.01 0.0375" type="box" material="block_mat" mass="0.05"/>
     </body>
 
     <camera name="cam_fixed" pos="0.9 0 1.2" mode="targetbody" target="table"/>
 
-    <body name="target" mocap="true" pos="0.5 0 0.5">
+    <!-- <body name="target" mocap="true" pos="0.5 0 0.5">
         <geom type="sphere" size="0.02" rgba="0 1 0 0.5" contype="0" conaffinity="0"/>
-    </body>
+    </body> -->
   </worldbody>
 
   <!-- <body name="wrist_cam_mount" parent="hand" pos="0.05 0 0.05" quat="0 0.707 -0.707 0">
       <camera name="cam_wrist" fovy="58"/>
   </body> -->
 
-  <equality>
-    <weld name="impedance_weld" body1="target" body2="hand" solref="0.02 1" solimp="0.9 0.95 0.001"/>
-  </equality>
+<!-- <equality>
+    <weld name="impedance_weld" body1="hand" body2="target" 
+          solref="0.005 1" solimp="0.99 0.995 0.001"/>
+</equality> -->
 
-  <keyframe>
+  <!-- <keyframe>
   <key name="home" 
        qpos="0 -0.93 0 -2.77 0 2.72 0.7853 0.04 0.04 
              0.5 0.0 0.875 1 0 0 0 
              0.5 -0.04 0.875 1 0 0 0 
              0.5 0.04 0.875 1 0 0 0" 
        ctrl="0 -0.92 0 -2.77 0 2.72 0.7853 110"/>
-</keyframe>
+</keyframe> -->
+<keyframe>
+    <key name="home" 
+         qpos="0 -0.93 0 -2.77 0 2.72 0.7853 0.04 0.04 
+               0.5 0.0 0.875 1 0 0 0
+               0.5 -0.04 0.875 1 0 0 0
+               0.5 0.04 0.875 1 0 0 0"
+         ctrl="0 -0.92 0 -2.77 0 2.72 0.7853 110"/>
+  </keyframe>
 </mujoco>

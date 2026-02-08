@@ -3,7 +3,7 @@ import websockets
 import json
 import torch
 import numpy as np
-from polymetis import RobotInterface, GripperInterface
+# from polymetis import RobotInterface, GripperInterface
 from scipy.spatial.transform import Rotation as R
 import ssl
 import time
@@ -12,6 +12,12 @@ import os
 import traceback
 
 from cam import DualRealsenseRecorder
+USE_SIM = True
+if USE_SIM:
+    from sim import SimRobotInterface as RobotInterface
+    from sim import SimGripperInterface as GripperInterface
+else:
+    from polymetis import RobotInterface, GripperInterface
 # import shutil
 
 # --- config ---
@@ -23,7 +29,10 @@ ROBOT_BASE = np.array([0.0, 0.0, 0.0])
 CAM1_SERIAL = "215222078938" 
 CAM2_SERIAL = "819612070440"
 ROBOT_IP = "129.97.71.27"
-SSD_LOC="/mnt/diffusion_policy/tasks/pick_place/dual_wrist/world_model/"
+# SSD_LOC="/mnt/diffusion_policy/tasks/jenga_mujoco/"
+SSD_LOC="tasks/jenga_mujoco/"
+
+E_NO = 1
 # ---------------------
 
 class Teleop:
@@ -57,7 +66,7 @@ class Teleop:
 
 
         # controller to robot scaling
-        self.position_scale = np.array([1.2, 1.2, 2.2])
+        self.position_scale = np.array([1.5, 1.5, 2.5])
         self.rotation_scale = 0.3  
 
         # limit controller output (from 60hz) to 10Hz
@@ -84,23 +93,25 @@ class Teleop:
         self.gripper_closed = False
 
         # episode number to record from (and init recorder)
-        self.i = 48
+        self.i = E_NO
         self.recorder = DualRealsenseRecorder(self.i, CAM1_SERIAL, CAM2_SERIAL, SSD_LOC)
 
         # dont track controller at start
         self.track = False
         self.pos_delta = 0
 
+        self._x_pressed = False
+
     # transform controller values into robot frame
     def transform_controller_to_robot(self, pos):
         # in : [x, y z] (controller frame)
         # out : [-x, z, y] (robot frame)
-        return np.array([-pos[0], pos[2], pos[1]])
+        return np.array([-pos[2], pos[0], pos[1]])
 
     def transform_controller_quat(self, q):
         # in: [x, y, z, w] (controller frame)
         # out: [-x, z, y, w] (robot frame) 
-        return np.array([-q[0], q[2], q[1], q[3]])
+        return np.array([-q[2], q[0], q[1], q[3]])
 
     def calibrate(self, controller_pos, controller_quat):
         """Calibrate coordinate systems"""
@@ -261,7 +272,22 @@ class Teleop:
         print(f"Saved trajectory to: {filename}")
         self.i +=1
     
-    
+    def handle_reset(self, x_butt):
+        """Checks for X button press and triggers robot/sim reset"""
+        if x_butt > 0.5 and not self._x_pressed:
+            self._x_pressed = True
+            print("!!! Button X Pressed: Resetting Simulation !!!")
+            
+            # Call reset on the robot interface
+            self.robot.reset()
+            
+            # After a reset, we must re-calibrate or stop tracking to avoid jumps
+            self.track = False
+            self.calibrated = False 
+            print("Robot reset. Press 'A' to re-calibrate and start tracking.")
+            
+        elif x_butt <= 0.5:
+            self._x_pressed = False
 
     async def handle_controller_data(self, websocket):
         """Process incoming controller data"""
@@ -286,6 +312,9 @@ class Teleop:
                 grip_button = data.get('grip', 0.0)
                 a_butt = data.get('button_a', 0.0)
                 b_butt = data.get('button_b', 0.0)
+                x_butt = data.get('button_x', 0.0)
+
+                self.handle_reset(x_butt)
 
                 self.tracking(a_butt, b_butt, controller_pos)
 

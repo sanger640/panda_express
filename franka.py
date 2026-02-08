@@ -1,6 +1,13 @@
 import numpy as np
-from polymetis import RobotInterface, GripperInterface
+# from polymetis import RobotInterface, GripperInterface
 import torch
+
+USE_SIM = True # Set to False for real robot
+if USE_SIM:
+    from sim import SimRobotInterface as RobotInterface
+    from sim import SimGripperInterface as GripperInterface
+else:
+    from polymetis import RobotInterface, GripperInterface
 
 class Franka:
     def __init__(self, robot_ip):

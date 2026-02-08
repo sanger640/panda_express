@@ -1,6 +1,6 @@
 import numpy as np
 from polymetis import RobotInterface, GripperInterface
-
+IP = ""
 def main():
     # takes robot to home pose
     robot = RobotInterface(ip_address="129.97.71.27")
