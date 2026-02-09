@@ -32,7 +32,7 @@ ROBOT_IP = "129.97.71.27"
 # SSD_LOC="/mnt/diffusion_policy/tasks/jenga_mujoco/"
 SSD_LOC="tasks/jenga_mujoco/"
 
-E_NO = 1
+E_NO = 103
 # ---------------------
 
 class Teleop:
