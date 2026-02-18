@@ -11,13 +11,15 @@ import grpc
 import os
 import traceback
 
-from cam import DualRealsenseRecorder
+
 USE_SIM = True
 if USE_SIM:
     from sim import SimRobotInterface as RobotInterface
     from sim import SimGripperInterface as GripperInterface
+    from sim import SimRecorder as DualRealsenseRecorder
 else:
     from polymetis import RobotInterface, GripperInterface
+    from cam import DualRealsenseRecorder
 # import shutil
 
 # --- config ---

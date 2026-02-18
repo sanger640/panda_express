@@ -26,22 +26,10 @@ class SimContext:
         self.lock = threading.Lock()
         self.running = True
         
+        # Launch viewer (non-blocking)
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         self.thread = threading.Thread(target=self._physics_loop, daemon=True)
         self.thread.start()
-
-    # def reset_simulation(self):
-    #     """Resets the MuJoCo data to the initial keyframe safely"""
-    #     with self.lock:
-    #         # Reset to keyframe 0 (defined in your XML)
-    #         mujoco.mj_resetDataKeyframe(self.model, self.data, 0)
-            
-    #         # Ensure the gripper state in the simulation matches the 'Open' constant
-    #         self.gripper_val = GP
-            
-    #         # Re-run forward kinematics to update site positions immediately
-    #         mujoco.mj_forward(self.model, self.data)
-    #         print("[SIM] Scene reset to keyframe 0")
 
     def reset_simulation(self):
         """Resets MuJoCo data and applies 5% random noise to blocks."""
@@ -52,50 +40,34 @@ class SimContext:
             # 2. Define the blocks we want to randomize
             block_names = ["block_middle", "block_left", "block_right"]
             
-            # Workspace scale for '5%' (based on table/block layout ~0.4m scale)
-            # 5% of 0.4m is approx 0.02m (2cm)
+            # Noise parameters
             pos_noise_range = 0.005
-            # 5% of 180 degrees is approx 9 degrees
             rot_noise_range = 8.0 
 
             for name in block_names:
-                # print(name)
-                # Find the qpos address for the body (free joint)
-                # qpos for free joint is 7 elements: [x, y, z, qw, qx, qy, qz]
                 body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
-                # print("bod id")
-                # print(body_id)
+                if body_id == -1: continue
+                
                 joint_id = self.model.body_jntadr[body_id]
                 qpos_adr = self.model.jnt_qposadr[joint_id]
-                # print("qpos_addy")
-                # print(qpos_adr)
+                
                 if qpos_adr != -1:
-                    # Apply X, Y variation (indices 0 and 1)
-                    # print("0")
-                    # print(self.data.qpos[qpos_adr])
+                    # Apply X, Y variation
                     self.data.qpos[qpos_adr] += np.random.uniform(-pos_noise_range, pos_noise_range)
-                    # print("1")
-                    # print(self.data.qpos[qpos_adr+1])
                     self.data.qpos[qpos_adr + 1] += np.random.uniform(-pos_noise_range, pos_noise_range)
 
-                    # Apply XY (Z-axis) rotation variation
-                    # Get current orientation
+                    # Apply Z-axis rotation variation
                     orig_quat = self.data.qpos[qpos_adr + 3 : qpos_adr + 7]
-                    
-                    # Generate random rotation around Z axis
                     z_angle = np.radians(np.random.uniform(-rot_noise_range, rot_noise_range))
                     noise_rot = R.from_euler('z', z_angle)
                     
-                    # Combine orientations (MuJoCo is WXYZ, Scipy is XYZW)
+                    # MuJoCo is WXYZ, Scipy is XYZW
                     curr_rot = R.from_quat([orig_quat[1], orig_quat[2], orig_quat[3], orig_quat[0]])
                     new_rot = noise_rot * curr_rot
                     new_quat = new_rot.as_quat()
                     
-                    # Back to MuJoCo WXYZ
+                    # Back to WXYZ
                     self.data.qpos[qpos_adr + 3 : qpos_adr + 7] = [new_quat[3], new_quat[0], new_quat[1], new_quat[2]]
-                    # Verification Print
-                    pos = self.data.qpos[qpos_adr : qpos_adr + 3]
-                    print(f"[{name}] BodyID: {body_id} | QPos Adr: {qpos_adr} | New Pos: {pos.round(4)}")
 
             # 3. Finalize
             self.gripper_val = GP
@@ -109,8 +81,7 @@ class SimContext:
         while self.running:
             start = time.time()
             with self.lock:
-                # 1. RUN CONTROLLER (If registered)
-                # This ensures torques are updated every single physics step!
+                # 1. RUN CONTROLLER
                 if self.control_callback is not None:
                     self.control_callback()
                 
@@ -130,6 +101,7 @@ class SimContext:
 
 SIM = SimContext()
 GP = 110
+
 class SimRobotInterface:
     def __init__(self, ip_address=None):
         print(f"[SIM] Connected to MuJoCo Robot (Background OSC Mode)")
@@ -144,19 +116,16 @@ class SimRobotInterface:
             self.site_id = SIM.model.site('attachment_site').id
             SIM.gripper_val = GP
             
-            # Set initial target to current pose to prevent jumping
+            # Set initial target to current pose
             self.target_pos = SIM.data.site_xpos[self.site_id].copy()
             self.target_quat = np.zeros(4)
             mujoco.mju_mat2Quat(self.target_quat, SIM.data.site_xmat[self.site_id])
-            
-            # REGISTER CONTROLLER to the background thread
+            print("hey there")
+            # REGISTER CONTROLLER
             SIM.control_callback = self._internal_control_loop
 
     def _internal_control_loop(self):
-        """
-        This runs inside the SimContext lock, every physics step.
-        It keeps the robot floating at self.target_pos.
-        """
+        """Runs inside SimContext lock every physics step."""
         # A. Current State
         curr_pos = SIM.data.site_xpos[self.site_id]
         curr_mat = SIM.data.site_xmat[self.site_id].reshape(3, 3)
@@ -195,13 +164,10 @@ class SimRobotInterface:
         SIM.data.ctrl[7] = SIM.gripper_val
 
     def update_desired_ee_pose(self, position, orientation):
-        """
-        Now simply updates the target. The background thread handles the physics.
-        """
+        """Thread-safe update of the target."""
         if isinstance(position, torch.Tensor): position = position.numpy()
         if isinstance(orientation, torch.Tensor): orientation = orientation.numpy()
-        # position = np.array([position[1], -position[0], position[2]])
-        # Thread-safe update of the target
+        
         with SIM.lock:
             self.target_pos = position
             # Convert scalar-last (scipy) to scalar-first (mujoco)
@@ -210,35 +176,52 @@ class SimRobotInterface:
     def get_ee_pose(self):
         with SIM.lock:
             pos = SIM.data.site_xpos[self.site_id].copy()
-            # pos = np.array([pos[1], -pos[0], pos[2]])
             mat = SIM.data.site_xmat[self.site_id].reshape(3, 3)
             quat = R.from_matrix(mat).as_quat() 
             return torch.Tensor(pos), torch.Tensor(quat)
 
-    def reset(self):
-        """Interface method called by Teleop"""
-        # 1. Trigger the physics reset
-        SIM.reset_simulation()
+    # --- ADDED METHODS FOR COMPATIBILITY ---
+    def get_state(self):
+        """Returns [x, y, z, grip_state] where grip_state is 1.0 (closed) or -1.0 (open)."""
+        pos, _ = self.get_ee_pose()
+        pos = pos.numpy()
         
-        # 2. Crucial: Update the internal target_pos to the new reset position
-        # This prevents the robot from 'flying' back to where it was before the reset
+        # Map Sim gripper (0=Closed, 110=Open) to Policy (1=Closed, -1=Open)
+        is_closed = (SIM.gripper_val < 50.0) 
+        grip_state = [1.0] if is_closed else [-1.0]
+        
+        return np.concatenate([pos, grip_state]).astype(np.float32)
+
+    def execute(self, action):
+        """Executes a 4D action [x, y, z, grip_cmd]."""
+        # 1. Parse Action
+        target_pos = torch.from_numpy(action[:3]).float()
+        grip_cmd = action[3]
+        
+        # 2. Keep current orientation (convert internal WXYZ back to XYZW for update method)
+        curr_quat_wxyz = self.target_quat
+        target_quat = torch.tensor([curr_quat_wxyz[1], curr_quat_wxyz[2], curr_quat_wxyz[3], curr_quat_wxyz[0]])
+        
+        # 3. Update Robot Target
+        self.update_desired_ee_pose(target_pos, target_quat)
+        
+        # 4. Handle Gripper
+        if grip_cmd > 0.9:
+            with SIM.lock: SIM.gripper_val = 0.0 # Close
+        elif grip_cmd < -0.9:
+            with SIM.lock: SIM.gripper_val = GP # Open
+
+    def reset(self):
+        SIM.reset_simulation()
         with SIM.lock:
             self.target_pos = SIM.data.site_xpos[self.site_id].copy()
-            
-            # Ensure self.target_quat is float64 and writeable
             if self.target_quat.dtype != np.float64:
                 self.target_quat = self.target_quat.astype(np.float64)
-                
-            # Call with explicit float64 views
-            mujoco.mju_mat2Quat(self.target_quat, SIM.data.site_xmat[self.site_id].astype(np.float64))
+            mujoco.mju_mat2Quat(self.target_quat, SIM.data.site_xmat[self.site_id])
 
-    def start_cartesian_impedance(self, Kx=None, Kxd=None):
-        pass
+    def start_cartesian_impedance(self, Kx=None, Kxd=None): pass
+    def terminate_current_policy(self): pass
 
-    def terminate_current_policy(self):
-        pass
-
-# --- GRIPPER & CAMERA CLASSES REMAIN UNCHANGED ---
 class SimGripperInterface:
     def __init__(self, ip_address=None): pass
     def grasp(self, speed, force):
@@ -251,6 +234,7 @@ class SimDualCamera:
     def __init__(self, cam1_serial=None, cam2_serial=None, H=240, W=320, hz=30):
         self.H, self.W = H, W
         self.renderer = mujoco.Renderer(SIM.model, height=H, width=W)
+        
     def get_frames(self):
         with SIM.lock:
             self.renderer.update_scene(SIM.data, camera="cam_wrist")
