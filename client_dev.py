@@ -29,10 +29,10 @@ def main():
     diff_socket.connect(f"tcp://{GPU_SERVER_IP}:{DIFF_PORT}")
     print(f"Connected to Diffusion Policy at {GPU_SERVER_IP}:{DIFF_PORT}")
 
-    # # Dino WM Socket
-    # dino_socket = context.socket(zmq.REQ)
-    # dino_socket.connect(f"tcp://{GPU_SERVER_IP}:{DINO_PORT}")
-    # print(f"Connected to Dino WM at {GPU_SERVER_IP}:{DINO_PORT}")
+    # Dino WM Socket
+    dino_socket = context.socket(zmq.REQ)
+    dino_socket.connect(f"tcp://{GPU_SERVER_IP}:{DINO_PORT}")
+    print(f"Connected to Dino WM at {GPU_SERVER_IP}:{DINO_PORT}")
 
     # diff_socket.setsockopt(zmq.RCVTIMEO, 5000) # 5 second timeout
     # dino_socket.setsockopt(zmq.RCVTIMEO, 5000)
@@ -103,128 +103,132 @@ def main():
             # 2. Proprio History (1, T, D)
             # 3. Action Sequence (1, T + N_pred, D) - History + Future
             
-            # print("Querying Dino World Model...")
+            print("Querying Dino World Model...")
             
-            # # 1. Prepare Visual: Stack Cam1 and Cam2 on dim 1 -> (T, 2, C, H, W)
-            # # Ensure range 0-255 uint8 if that's what cameras return
-            # vis_hist = np.stack([b_c1, b_c2], axis=1) 
-            # vis_hist = vis_hist[np.newaxis, ...] # Add Batch -> (1, T, 2, C, H, W)
+            # 1. Prepare Visual: Stack Cam1 and Cam2 on dim 1 -> (T, 2, C, H, W)
+            # Ensure range 0-255 uint8 if that's what cameras return
+            vis_hist = np.stack([b_c1, b_c2], axis=1) 
+            vis_hist = vis_hist[np.newaxis, ...] # Add Batch -> (1, T, 2, C, H, W)
 
-            # # 2. Prepare Proprio
-            # prop_hist = b_s[np.newaxis, ...] # (1, T, D)
+            # 2. Prepare Proprio
+            prop_hist = b_s[np.newaxis, ...] # (1, T, D)
 
-            # # 3. Prepare Full Action Sequence
-            # hist_actions = np.stack(list(action_buffer)) # (T, D)
-            # full_actions = np.concatenate([hist_actions, pred_actions], axis=0) # (T+N, D)
-            # full_actions = full_actions[np.newaxis, ...] # (1, T+N, D)
+            # 3. Prepare Full Action Sequence
+            hist_actions = np.stack(list(action_buffer)) # (T, D)
+            full_actions = np.concatenate([hist_actions, pred_actions], axis=0) # (T+N, D)
+            full_actions = full_actions[np.newaxis, ...] # (1, T+N, D)
+            print("vis_history")
+            print(vis_hist.shape)
+            print("full actions")
+            print(full_actions.shape)
 
-            # dino_socket.send_pyobj({
-            #     'visual': vis_hist,
-            #     'proprio': prop_hist,
-            #     'actions': full_actions
-            # })
+            dino_socket.send_pyobj({
+                'visual': vis_hist,
+                'proprio': prop_hist,
+                'actions': full_actions
+            })
 
-            # dino_response = dino_socket.recv_pyobj()
-            # # Predicted States: (1, N, 2, 3, H, W) usually
-            # if 'error' in dino_response:
-            #     print(f"Dino Error: {dino_response['error']}")
-            #     pred_imgs = None
-            # else:
-            #     pred_imgs = dino_response['states'] 
-            #     # Shape check: (1, N, 2, 3, H, W)
-            #     # We typically want to visualize the future predictions corresponding to pred_actions
+            dino_response = dino_socket.recv_pyobj()
+            # Predicted States: (1, N, 2, 3, H, W) usually
+            if 'error' in dino_response:
+                print(f"Dino Error: {dino_response['error']}")
+                pred_imgs = None
+            else:
+                pred_imgs = dino_response['states'] 
+                # Shape check: (1, N, 2, 3, H, W)
+                # We typically want to visualize the future predictions corresponding to pred_actions
 
-            # # D. Execute Actions & Capture Ground Truth
-            # gt_imgs_c1 = []
-            # gt_imgs_c2 = []
+            # D. Execute Actions & Capture Ground Truth
+            gt_imgs_c1 = []
+            gt_imgs_c2 = []
             
-            # print(f"Executing {len(pred_actions)} actions...")
-            # for i, action in enumerate(pred_actions):
-            #     # Execute
-            #     robot.execute(action)
+            print(f"Executing {len(pred_actions)} actions...")
+            for i, action in enumerate(pred_actions):
+                # Execute
+                robot.execute(action)
                 
-            #     # Step physics roughly to match control rate
-            #     # SimContext runs its own thread, but execute updates the target.
-            #     # We sleep to let physics settle for 1/Hz
-            #     time.sleep(1.0 / CONTROL_HZ)
+                # Step physics roughly to match control rate
+                # SimContext runs its own thread, but execute updates the target.
+                # We sleep to let physics settle for 1/Hz
+                time.sleep(1.0 / CONTROL_HZ)
                 
-            #     # Capture GT Frame
-            #     c1, c2 = cameras.get_frames() # (C,H,W)
+                # Capture GT Frame
+                c1, c2 = cameras.get_frames() # (C,H,W)
                 
-            #     # Convert for saving/display (C,H,W) -> (H,W,C)
-            #     gt_imgs_c1.append(c1.transpose(1, 2, 0))
-            #     gt_imgs_c2.append(c2.transpose(1, 2, 0))
+                # Convert for saving/display (C,H,W) -> (H,W,C)
+                gt_imgs_c1.append(c1.transpose(1, 2, 0))
+                gt_imgs_c2.append(c2.transpose(1, 2, 0))
 
-            #     # Update buffers for NEXT closed-loop iteration
-            #     # (Even though we are running open-loop for this sequence, 
-            #     # we update buffers so the next major step is continuous)
-            #     s = robot.get_state()
-            #     obs_buffer.append({'c1': c1, 'c2': c2, 's': s})
-            #     action_buffer.append(action)
+                # Update buffers for NEXT closed-loop iteration
+                # (Even though we are running open-loop for this sequence, 
+                # we update buffers so the next major step is continuous)
+                s = robot.get_state()
+                obs_buffer.append({'c1': c1, 'c2': c2, 's': s})
+                action_buffer.append(action)
 
-            # # E. Visualize / Save Results
-            # if pred_imgs is not None:
-            #     # Process Predictions
-            #     # pred_imgs shape: (1, N, 2, 3, H, W)
-            #     # Extract first batch
-            #     preds = pred_imgs[0] # (N, 2, 3, H, W)
+            # E. Visualize / Save Results
+            if pred_imgs is not None:
+                # Process Predictions
+                # pred_imgs shape: (1, N, 2, 3, H, W)
+                # Extract first batch
+                preds = pred_imgs[0] # (N, 2, 3, H, W)
                 
-            #     display_imgs = []
+                display_imgs = []
                 
-            #     # Loop through predicted steps
-            #     num_steps = min(len(preds), len(gt_imgs_c1))
+                # Loop through predicted steps
+                num_steps = min(len(preds), len(gt_imgs_c1))
                 
-            #     for t in range(num_steps):
-            #         # Ground Truth (Cam1) - Top Row
-            #         gt_img = gt_imgs_c1[t] # Already HWC, RGB
+                for t in range(num_steps):
+                    # Ground Truth (Cam1) - Top Row
+                    gt_img = gt_imgs_c1[t] # Already HWC, RGB
                     
-            #         # Prediction (Cam1 is index 0 or 1 depending on model training)
-            #         # Assuming Index 1 is Front (Cam1) and Index 0 is Wrist based on standard DinoWM config?
-            #         # Or check SimDualCamera: Cam1 (Wrist?) vs Cam2 (Fixed?)
-            #         # Let's verify SimDualCamera:
-            #         #   renderer.update_scene(..., "cam_wrist") -> img1
-            #         #   renderer.update_scene(..., "cam_fixed") -> img2
-            #         # So Cam1 = Wrist, Cam2 = Fixed.
-            #         # DinoWM usually treats View 0 as Wrist, View 1 as Front.
+                    # Prediction (Cam1 is index 0 or 1 depending on model training)
+                    # Assuming Index 1 is Front (Cam1) and Index 0 is Wrist based on standard DinoWM config?
+                    # Or check SimDualCamera: Cam1 (Wrist?) vs Cam2 (Fixed?)
+                    # Let's verify SimDualCamera:
+                    #   renderer.update_scene(..., "cam_wrist") -> img1
+                    #   renderer.update_scene(..., "cam_fixed") -> img2
+                    # So Cam1 = Wrist, Cam2 = Fixed.
+                    # DinoWM usually treats View 0 as Wrist, View 1 as Front.
                     
-            #         # Let's stack both views for a complete comparison
-            #         # GT Column: [Wrist GT]
-            #         #            [Fixed GT]
-            #         gt_wrist = gt_imgs_c1[t]
-            #         gt_fixed = gt_imgs_c2[t]
+                    # Let's stack both views for a complete comparison
+                    # GT Column: [Wrist GT]
+                    #            [Fixed GT]
+                    gt_wrist = gt_imgs_c1[t]
+                    gt_fixed = gt_imgs_c2[t]
                     
-            #         # Pred Column
-            #         # preds[t, 0] -> Wrist Pred (3, H, W) -> Transpose to HWC
-            #         # preds[t, 1] -> Fixed Pred
-            #         pred_wrist = preds[t, 0].transpose(1, 2, 0)
-            #         pred_fixed = preds[t, 1].transpose(1, 2, 0)
+                    # Pred Column
+                    # preds[t, 0] -> Wrist Pred (3, H, W) -> Transpose to HWC
+                    # preds[t, 1] -> Fixed Pred
+                    pred_wrist = preds[t, 0].transpose(1, 2, 0)
+                    pred_fixed = preds[t, 1].transpose(1, 2, 0)
                     
-            #         # Stitch: Top=GT, Bottom=Pred
-            #         # Col: Wrist | Fixed
+                    # Stitch: Top=GT, Bottom=Pred
+                    # Col: Wrist | Fixed
                     
-            #         # Create Column for this timestep
-            #         #  [ GT Wrist ]
-            #         #  [ Pr Wrist ]
-            #         col_wrist = np.vstack([gt_wrist, pred_wrist])
+                    # Create Column for this timestep
+                    #  [ GT Wrist ]
+                    #  [ Pr Wrist ]
+                    col_wrist = np.vstack([gt_wrist, pred_wrist])
                     
-            #         #  [ GT Fixed ]
-            #         #  [ Pr Fixed ]
-            #         col_fixed = np.vstack([gt_fixed, pred_fixed])
+                    #  [ GT Fixed ]
+                    #  [ Pr Fixed ]
+                    col_fixed = np.vstack([gt_fixed, pred_fixed])
                     
-            #         # Combined Step Image
-            #         step_img = np.vstack([col_wrist, col_fixed])
+                    # Combined Step Image
+                    step_img = np.vstack([col_wrist, col_fixed])
                     
-            #         display_imgs.append(step_img)
+                    display_imgs.append(step_img)
 
-            #     # Horizontally stack time steps
-            #     full_viz = np.hstack(display_imgs)
+                # Horizontally stack time steps
+                full_viz = np.hstack(display_imgs)
                 
-            #     # Save
-            #     # Convert RGB to BGR for OpenCV saving
-            #     full_viz_bgr = cv2.cvtColor(full_viz, cv2.COLOR_RGB2BGR)
-            #     save_path = os.path.join(OUTPUT_DIR, f"step_{step_count}.png")
-            #     cv2.imwrite(save_path, full_viz_bgr)
-            #     print(f"Saved visualization to {save_path}")
+                # Save
+                # Convert RGB to BGR for OpenCV saving
+                full_viz_bgr = cv2.cvtColor(full_viz, cv2.COLOR_RGB2BGR)
+                save_path = os.path.join(OUTPUT_DIR, f"step_{step_count}.png")
+                cv2.imwrite(save_path, full_viz_bgr)
+                print(f"Saved visualization to {save_path}")
 
             step_count += 1
 
