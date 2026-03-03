@@ -32,9 +32,9 @@ CAM1_SERIAL = "215222078938"
 CAM2_SERIAL = "819612070440"
 ROBOT_IP = "129.97.71.27"
 # SSD_LOC="/mnt/diffusion_policy/tasks/jenga_mujoco/"
-SSD_LOC="tasks/jenga_mujoco/"
+SSD_LOC="tasks/jenga_dist_test/"
 
-E_NO = 103
+E_NO = 1
 # ---------------------
 
 class Teleop:
@@ -243,13 +243,16 @@ class Teleop:
             print(f"RECORDING STOPPED ({len(self.trajectory_data)} waypoints)")
 
     
-    def record_waypoint(self, position, orientation, gripper):
+    def record_waypoint(self, position, orientation, proc_pos, proc_quat, proc_grip, gripper):
         timestamp = time.time()
         self.trajectory_data.append({
             'timestamp': timestamp,
             'position': position.numpy().tolist(),
             'orientation': orientation.numpy().tolist(),
-            'gripper': gripper
+            'gripper': gripper,
+            'proc_pos': proc_pos.numpy().tolist(),
+            'proc_quat': proc_quat.numpy().tolist(),
+            'proc_gripper': proc_grip
         })
 
     def save_trajectory(self):
@@ -319,6 +322,8 @@ class Teleop:
                 self.handle_reset(x_butt)
 
                 self.tracking(a_butt, b_butt, controller_pos)
+                ppose, _ = self.robot.get_ee_pose()
+                print(f"Pose: {ppose}")
 
                 if self.track == True: 
 
@@ -342,18 +347,23 @@ class Teleop:
                     self.prev_controller_pos = controller_pos.copy()
                     self.prev_controller_quat = controller_quat.copy()
 
-                    self.execute(target_pos_tensor, target_quat_tensor)
+                    
                     
                     # Gripper control
-                    self.gripper_action(trigger_value)
+                    
                     self.rec(grip_button)
-
                     if self.recording:
                         # record waypoints
+                        proc_pos, proc_quat = self.robot.get_ee_pose()
                         if self.enable_orientation:
-                            self.record_waypoint(target_pos_tensor, target_quat_tensor, self.gripper_closed)
+                            self.record_waypoint(target_pos_tensor, target_quat_tensor, proc_pos, proc_quat, self.last_gripper_closed, self.gripper_closed)
                         else:
-                            self.record_waypoint(target_pos_tensor, self.initial_robot_quat, self.gripper_closed)
+                            self.record_waypoint(target_pos_tensor, self.initial_robot_quat, proc_pos, proc_quat, self.last_gripper_closed, self.gripper_closed)
+
+                    self.gripper_action(trigger_value)
+                    self.execute(target_pos_tensor, target_quat_tensor)
+
+                    
 
             except json.JSONDecodeError as e:
                 print(f"JSON decode error: {e}")

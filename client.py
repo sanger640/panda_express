@@ -3,9 +3,13 @@ import time
 from collections import deque
 from franka import Franka
 from cam import DualRealSense
+import sim
+import numpy as np
 
 # --- CONFIGURATION ---
-GPU_SERVER_IP = "129.97.71.51" 
+# GPU_SERVER_IP = "129.97.71.51" 
+GPU_SERVER_IP = "host.docker.internal"  # IP of your GPU machine
+
 PORT = 5555
 ROBOT_IP = "129.97.71.27"
 
@@ -24,16 +28,27 @@ def main():
     socket.connect(f"tcp://{GPU_SERVER_IP}:{PORT}")
     print(f"Connected to GPU Server at {GPU_SERVER_IP}")
 
-    cameras = DualRealSense(cam1_serial=CAM1_SERIAL, cam2_serial=CAM2_SERIAL, H=IMG_H, W=IMG_W, hz=30)
-    robot = Franka(robot_ip=ROBOT_IP)
+    # cameras = DualRealSense(cam1_serial=CAM1_SERIAL, cam2_serial=CAM2_SERIAL, H=IMG_H, W=IMG_W, hz=30)
+    # robot = Franka(robot_ip=ROBOT_IP)
+    robot = sim.SimRobotInterface()
+    gripper = sim.SimGripperInterface()
+    cameras = sim.SimDualCamera(H=IMG_H, W=IMG_W, hz=30)
 
 
     obs_buffer = deque(maxlen=2)
+    obs_buffer.clear()
+    step_count = 0
+    ep_count = 0
 
     try:
         while True:
-            loop_start = time.time()
             obs_buffer.clear()
+            loop_start = time.time()
+            if step_count == 50:
+                robot.reset()
+                step_count = 0
+                ep_count+=1
+                obs_buffer = deque(maxlen=2)
 
             while len(obs_buffer) < 2:
                 i1, i2 = cameras.get_frames()
@@ -59,11 +74,15 @@ def main():
             # execute actions
             for i, action in enumerate(actions):
                 step_start = time.time()
-                robot.execute(action)                
-                elapsed = time.time() - step_start
-                sleep_time = max(0, (1.0 / CONTROL_HZ) - elapsed)
-                time.sleep(sleep_time)
-
+                robot.execute(action)
+                # c1, c2 = cameras.get_frames() # (C,H,W)
+                # s = robot.get_state()
+                # obs_buffer.append({'c1': c1, 'c2': c2, 's': s})                
+                # elapsed = time.time() - step_start
+                # sleep_time = max(0, (1.0 / CONTROL_HZ) - elapsed)
+                # time.sleep(sleep_time)
+            step_count += 1
+            # print(f"ep: {ep_count} | step: {step_count}")
     except KeyboardInterrupt:
         print("stopped")
         robot.robot.terminate_current_policy()

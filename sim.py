@@ -41,8 +41,11 @@ class SimContext:
             block_names = ["block_middle", "block_left", "block_right"]
             
             # Noise parameters
+            # pos_noise_range = 0.005
+            # rot_noise_range = 8.0
+
             pos_noise_range = 0.005
-            rot_noise_range = 8.0 
+            rot_noise_range = 3.0 
 
             for name in block_names:
                 body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
@@ -106,9 +109,12 @@ class SimRobotInterface:
     def __init__(self, ip_address=None):
         print(f"[SIM] Connected to MuJoCo Robot (Background OSC Mode)")
         
-        self.kp_pos = 150.0   
-        self.kd_pos = 14.0    
-        self.kp_rot = 10.0    
+        self.kp_pos = 500.0   
+        # self.kp_pos = 150
+        self.kd_pos = 30.0
+        # self.kd_pos = 14   
+        self.kp_rot = 20.0
+        # self.kp_rot = 10.0
         self.kd_rot = 0.5     
         self.knull  = 0.1     
 
