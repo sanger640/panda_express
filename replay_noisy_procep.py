@@ -14,10 +14,10 @@ from sim import SimRobotInterface, SimGripperInterface, SimRecorder, SIM
 
 # --- CONFIGURATION ---
 SOURCE_TASK_DIR = "tasks/jenga_mujoco/"
-TARGET_TASK_DIR = "tasks/jenga_mujoco_noise/"  # New folder for noisy data
+TARGET_TASK_DIR = "tasks/jenga_mujoco_noise2/"  # New folder for noisy data
 
 # How many new noisy episodes to generate
-N_EPISODES_TO_GENERATE = 1000
+N_EPISODES_TO_GENERATE = 100
 
 # Dummy serials (required by SimRecorder class but ignored in Sim)
 CAM1_SERIAL = "215222078938"
@@ -26,7 +26,7 @@ CAM2_SERIAL = "819612070440"
 # --- NOISE PARAMETERS (Tuned for Jenga) ---
 # Fixed noise is safer than relative noise for delicate tasks.
 # 2mm position noise is enough to robustify without knocking over the tower.
-NOISE_POS_STD = 0.007    # +/- 2mm standard deviation
+NOISE_POS_STD = 0.005    # +/- 2mm standard deviation
 NOISE_ROT_STD = 0.05    # +/- ~1 degree (0.017 rad) standard deviation
 
 def get_saved_trajectories(root_dir):
@@ -83,7 +83,9 @@ def main():
     print(f"[REPLAY] Found {len(traj_files)} source trajectories.")
 
     # 3. Determine Start Index for New Data
-    current_idx = get_next_episode_id(SOURCE_TASK_DIR)
+    # current_idx = get_next_episode_id(SOURCE_TASK_DIR)
+    current_idx = 1
+
     recorder = SimRecorder(current_idx, CAM1_SERIAL, CAM2_SERIAL, TARGET_TASK_DIR)
     print(f"[REPLAY] Writing new episodes starting at ID: {current_idx}")
 
@@ -179,10 +181,14 @@ def main():
                     gripper.goto(255, 0.1, 0.1) # Open
 
                 # Preview
-                recorder.show_preview(is_recording=True)
+                # recorder.show_preview(is_recording=False)
 
             # F. Finish Episode
             recorder.stop()
+
+            # while(recorder.frame_queue.empty() == False):
+            #     print(recorder.frame_queue.qsize())
+            #     time.sleep(0.1) # Wait for all frames to be saved
             
             # --- PHASE 3: SAVE ---
             # Save trajectory JSON to the new folder

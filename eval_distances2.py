@@ -11,7 +11,7 @@ DINO_PORT = 5556
 
 ROOT_DIR = "tasks"
 SUCCESS_DIR = os.path.join(ROOT_DIR, "test_dist/upright")
-TOPPLE_DIR = os.path.join(ROOT_DIR, "test_dist/toppled")
+TOPPLE_DIR = os.path.join(ROOT_DIR, "test_dist/upright2")
 
 FILES = {
     "init_front": "init_front.png",

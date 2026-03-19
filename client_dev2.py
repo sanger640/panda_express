@@ -8,13 +8,13 @@ from collections import deque
 
 import sim
 # --- CONFIGURATION ---
-GPU_SERVER_IP = "host.docker.internal"  # IP of your GPU machine
+GPU_SERVER_IP = "localhost"  # IP of your GPU machine
 DIFF_PORT = 5555                # Diffusion Policy Port
 DINO_PORT = 5556                # Dino World Model Port
 
 IMG_W, IMG_H = 320, 240
 CONTROL_HZ = 10
-NUM_HIST = 2                    # Context history length
+NUM_HIST = 3                    # Context history length
 OUTPUT_DIR = "pg"      # Folder to save comparison images
 PLAN_BATCH_SIZE = 5    # 'b' - The total number of trajectories to evaluate
 # ---------------------
@@ -43,7 +43,7 @@ class DeviatorAgent():
     def __init__(self, act_seq, b, variance=0.0005):
         self.act_seq = act_seq # T x 4
         self.b = b
-        self.std_dev = 5e-3
+        self.std_dev = np.sqrt(variance)
         
     def perturbe(self):
         # 1. Tile the original sequence 'b' times -> Shape: (b, T, 4)
@@ -111,7 +111,7 @@ def main():
                 obs_buffer.clear()
                 action_buffer.clear()
 
-            while len(obs_buffer) < 2:
+            while len(obs_buffer) < NUM_HIST:
                 i1, i2 = cameras.get_frames()
                 s = robot.get_state()
                 obs_buffer.append({'c1': i1, 'c2': i2, 's': s})
@@ -122,7 +122,7 @@ def main():
             b_c1 = np.stack([x['c1'] for x in obs_buffer])
             b_c2 = np.stack([x['c2'] for x in obs_buffer])
             b_s = np.stack([x['s'] for x in obs_buffer])
-
+            # print(b_c1.shape, b_c2.shape, b_s.shape)
             # B. Query Diffusion Policy
             diff_socket.send_pyobj({
                 'cam1': b_c1.tobytes(),
@@ -152,7 +152,8 @@ def main():
             batch_hist_actions = np.tile(hist_actions, (PLAN_BATCH_SIZE, 1, 1)) # (b, T_hist, 4)
 
             full_actions = np.concatenate([batch_hist_actions, batch_pred_actions], axis=1) # (b, T_hist + N, 4)
-
+            # print(f"Full Action Shape: {full_actions.shape}")
+            # print(f"Full Actions: {full_actions}")
             dino_socket.send_pyobj({
                 'visual': vis_hist,
                 'proprio': prop_hist,
@@ -194,7 +195,7 @@ def main():
                 gt_imgs_c2.append(c2.transpose(1, 2, 0))
 
                 # Capture GT Frame
-                if i >= pred_actions.shape[0]-2:
+                if i >= pred_actions.shape[0]-NUM_HIST: # Only keep GT for the last few steps to align with predictions
                     # Update buffers for NEXT closed-loop iteration
                     s = robot.get_state()
                     obs_buffer.append({'c1': c1, 'c2': c2, 's': s})
