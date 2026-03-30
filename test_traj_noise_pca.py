@@ -10,7 +10,7 @@ import random
 # --- CONFIGURATION ---
 GPU_SERVER_IP = "localhost" 
 DINO_PORT = 5556
-LMDB_PATH = "/home/sanger/jenga_mujoco_noise/jenga_unified.lmdb" 
+LMDB_PATH = "/home/sanger/jenga_mujoco_noise/jenga_single.lmdb" 
 
 NUM_HIST = 3
 NUM_PRED = 8

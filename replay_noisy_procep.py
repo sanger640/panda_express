@@ -14,10 +14,10 @@ from sim import SimRobotInterface, SimGripperInterface, SimRecorder, SIM
 
 # --- CONFIGURATION ---
 SOURCE_TASK_DIR = "tasks/jenga_mujoco/"
-TARGET_TASK_DIR = "tasks/jenga_mujoco_noise2/"  # New folder for noisy data
+TARGET_TASK_DIR = "tasks/jenga_mujoco_noise/"  # New folder for noisy data
 
 # How many new noisy episodes to generate
-N_EPISODES_TO_GENERATE = 100
+N_EPISODES_TO_GENERATE = 50
 
 # Dummy serials (required by SimRecorder class but ignored in Sim)
 CAM1_SERIAL = "215222078938"
@@ -26,7 +26,8 @@ CAM2_SERIAL = "819612070440"
 # --- NOISE PARAMETERS (Tuned for Jenga) ---
 # Fixed noise is safer than relative noise for delicate tasks.
 # 2mm position noise is enough to robustify without knocking over the tower.
-NOISE_POS_STD = 0.005    # +/- 2mm standard deviation
+# NOISE_POS_STD = 0.005    # +/- 2mm standard deviation
+NOISE_POS_STD = 0.0025   # +/- 2mm standard deviation
 NOISE_ROT_STD = 0.05    # +/- ~1 degree (0.017 rad) standard deviation
 
 def get_saved_trajectories(root_dir):
@@ -84,7 +85,7 @@ def main():
 
     # 3. Determine Start Index for New Data
     # current_idx = get_next_episode_id(SOURCE_TASK_DIR)
-    current_idx = 1
+    current_idx = 51
 
     recorder = SimRecorder(current_idx, CAM1_SERIAL, CAM2_SERIAL, TARGET_TASK_DIR)
     print(f"[REPLAY] Writing new episodes starting at ID: {current_idx}")
@@ -122,7 +123,7 @@ def main():
 
             # C. Reset Simulation
             robot.reset()
-            time.sleep(0.5) # Let physics settle
+            time.sleep(0.1) # Let physics settle
 
             # D. Start Recording (To TARGET_TASK_DIR)
             # SimRecorder will automatically create the folder structure
@@ -219,6 +220,16 @@ def main():
             except: pass
 
     print("[DONE] Noise Augmentation Complete.")
+
+    # 1. Stop the physics loop thread safely
+    SIM.running = False 
+    
+    # 2. Ask the C++ MuJoCo viewer to cleanly detach from the X11 Display
+    if hasattr(SIM, 'viewer') and SIM.viewer.is_running():
+        SIM.viewer.close()
+        
+    # 3. Give the OS half a second to release the memory before Python exits
+    time.sleep(0.5)
 
 if __name__ == "__main__":
     main()

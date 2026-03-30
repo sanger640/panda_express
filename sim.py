@@ -2,13 +2,6 @@ import os
 
 # 1. Force the Hardware Backend BEFORE MuJoCo loads
 os.environ["MUJOCO_GL"] = "glfw"
-os.environ["GALLIUM_DRIVER"] = "d3d12"
-os.environ["LD_LIBRARY_PATH"] = "/usr/lib/wsl/lib:" + os.environ.get("LD_LIBRARY_PATH", "")
-os.environ["MESA_GL_VERSION_OVERRIDE"] = "4.6"
-os.environ["__GL_SYNC_TO_VBLANK"] = "0"
-
-# 2. Print a diagnostic to the console so we can see it's working
-print(f"[DEBUG] GALLIUM_DRIVER: {os.environ.get('GALLIUM_DRIVER')}")
 
 import mujoco
 import mujoco.viewer
@@ -35,7 +28,7 @@ class SimContext:
         self.lock = threading.Lock()
         self.running = True
         
-        # self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
+        self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         self.thread = threading.Thread(target=self._physics_loop, daemon=True)
         self.thread.start()
 
@@ -80,6 +73,7 @@ class SimContext:
         with self.lock:
             self.data.time = 0.0
         time_zero = time.time()
+        last_sim_time = 0.0  # Add this tracker
         
         while self.running:
             with self.lock:
@@ -90,8 +84,8 @@ class SimContext:
                 
                 now = time.time()
                 if now - last_render_time > (1.0 / target_fps):
-                    # if self.viewer.is_running():
-                    #     self.viewer.sync()
+                    if self.viewer.is_running():
+                        self.viewer.sync()
                     last_render_time = now
             
             # --- THE FIX: CATCH-UP REAL-TIME LOOP ---
@@ -103,7 +97,44 @@ class SimContext:
             delay = expected_real_time - current_time
             if delay > 0:
                 time.sleep(delay)
-
+    def _physics_loop(self):
+        last_render_time = time.time()
+        # Viewer sync rate (lowering this to 15.0 or 20.0 can give the camera thread more GPU airtime if needed)
+        target_fps = 30.0 
+        
+        # Reset internal simulation time for synchronization
+        with self.lock:
+            self.data.time = 0.0
+            
+        time_zero = time.time()
+        last_sim_time = 0.0  # You added this...
+        
+        while self.running:
+            with self.lock:
+                if self.control_callback is not None:
+                    self.control_callback()
+                
+                mujoco.mj_step(self.model, self.data)
+                
+                # --- THE TIME TRAVEL FIX (Added this block) ---
+                # If time went backward, a reset happened. Re-anchor to current real-world time!
+                if self.data.time < last_sim_time:
+                    time_zero = time.time() - self.data.time
+                last_sim_time = self.data.time
+                # ----------------------------------------------
+                
+                now = time.time()
+                if now - last_render_time > (1.0 / target_fps):
+                    if hasattr(self, 'viewer') and self.viewer.is_running():
+                        self.viewer.sync()
+                    last_render_time = now
+            
+            # --- CATCH-UP REAL-TIME LOOP ---
+            expected_real_time = time_zero + self.data.time
+            current_time = time.time()
+            delay = expected_real_time - current_time
+            if delay > 0:
+                time.sleep(delay)
 SIM = SimContext()
 GP = 110
 
@@ -254,18 +285,17 @@ class SimRecorder:
     def _capture_worker(self):
         renderer_wrist = mujoco.Renderer(SIM.model, height=480, width=640)
         renderer_fixed = mujoco.Renderer(SIM.model, height=480, width=640)
-        # Replace your existing context print with this:
-        # if hasattr(renderer_wrist, "_gl_context") and renderer_wrist._gl_context:
-        #     print(f"GL Context: {renderer_wrist._gl_context}")
-        # else:
-        #     print("GL Context: FAILED TO INITIALIZE HARDWARE")
         
-        # target_fps = 30.0
-        # period = 1.0 / target_fps
-        # next_time = time.time() + period
+        target_fps = 30.0
+        period = 1.0 / target_fps
+        
+        # Initialize OUTSIDE the loop
+        next_time = time.time() 
 
         while self.running:
-            t0 = time.time()
+            # Rigidly step forward exactly 33.3ms
+            next_time += period 
+            
             with SIM.lock:
                 renderer_wrist.update_scene(SIM.data, camera="cam_wrist")
                 renderer_fixed.update_scene(SIM.data, camera="cam_fixed")
@@ -273,27 +303,20 @@ class SimRecorder:
             img1_rgb = renderer_wrist.render()
             img2_rgb = renderer_fixed.render()
 
-            # img1 = cv2.cvtColor(img1_rgb, cv2.COLOR_RGB2BGR)
-            # img2 = cv2.cvtColor(img2_rgb, cv2.COLOR_RGB2BGR)
-            
-
             try:
                 self.frame_queue.put_nowait((time.time(), img1_rgb, img2_rgb))
             except queue.Full:
                 pass
             
-            # # Use proper yielding sleep here too
-            # now = time.time()
-            # sleep_time = next_time - now
+            # Sleep logic remains the same
+            now = time.time()
+            sleep_time = next_time - now
             
-            # if sleep_time > 0.005: # If more than 5ms, safe to use OS sleep
-            #     time.sleep(sleep_time - 0.005)
+            if sleep_time > 0.005: 
+                time.sleep(sleep_time - 0.005)
             
-            # # Spin-wait the last few milliseconds for high precision
-            # while time.time() < next_time:
-            #     pass
-            render_time = (time.time() - t0) * 1000
-            print(f"Render block took: {render_time:.1f} ms") 
+            while time.time() < next_time:
+                pass
 
     def _save_worker(self):
         fast_png = [cv2.IMWRITE_PNG_COMPRESSION, 1]
