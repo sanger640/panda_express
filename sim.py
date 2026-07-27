@@ -27,7 +27,10 @@ class SimContext:
 
         self.lock = threading.Lock()
         self.running = True
-        
+
+        self._ref_quats = {}
+        self._record_ref_quats()  # store upright quaternions before any noise is applied
+
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         self.thread = threading.Thread(target=self._physics_loop, daemon=True)
         self.thread.start()
@@ -63,12 +66,56 @@ class SimContext:
 
             self.gripper_val = GP
             mujoco.mj_forward(self.model, self.data)
+            self._record_ref_quats()  # update reference after each reset (new random pose)
             print("[SIM] Scene reset with random variation applied.")
+
+    def _record_ref_quats(self):
+        """Store post-reset quaternions for the two adjacent blocks (left and right).
+        Called after every reset so tilts are measured relative to the actual starting pose,
+        not the XML default — this accounts for the random rotation noise applied at reset."""
+        for name in ["block_left", "block_right"]:
+            body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
+            if body_id == -1:
+                continue
+            joint_id = self.model.body_jntadr[body_id]
+            qpos_adr = self.model.jnt_qposadr[joint_id]
+            if qpos_adr != -1:
+                self._ref_quats[name] = self.data.qpos[qpos_adr + 3:qpos_adr + 7].copy()
+
+    def get_block_tilt(self, block_name):
+        """Returns tilt in degrees from the reference upright quaternion recorded at last reset."""
+        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, block_name)
+        if body_id == -1 or block_name not in self._ref_quats:
+            return 0.0
+        joint_id = self.model.body_jntadr[body_id]
+        qpos_adr = self.model.jnt_qposadr[joint_id]
+        curr = self.data.qpos[qpos_adr + 3:qpos_adr + 7]   # (w,x,y,z)
+        ref  = self._ref_quats[block_name]
+        # Angular distance between two quaternions: 2*arccos(|q1 · q2|)
+        dot = float(np.clip(abs(np.dot(curr, ref)), 0.0, 1.0))
+        return float(np.degrees(2.0 * np.arccos(dot)))
+
+    def check_failure(self, threshold_deg=15.0):
+        """Check whether any adjacent block has toppled beyond threshold_deg.
+
+        Returns:
+            failed (bool): True if any block has toppled.
+            block_name (str|None): Name of the toppled block, or None.
+            tilt_deg (float): Worst tilt angle observed across both blocks.
+        """
+        worst_tilt, worst_block = 0.0, None
+        for name in ["block_left", "block_right"]:
+            tilt = self.get_block_tilt(name)
+            if tilt > worst_tilt:
+                worst_tilt, worst_block = tilt, name
+        if worst_tilt > threshold_deg:
+            return True, worst_block, worst_tilt
+        return False, None, worst_tilt
 
     def _physics_loop(self):
         last_render_time = time.time()
         target_fps = 30.0
-        
+
         # Reset internal simulation time for synchronization
         with self.lock:
             self.data.time = 0.0
