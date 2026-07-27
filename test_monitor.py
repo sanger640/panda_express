@@ -188,6 +188,8 @@ def main():
                     "visual":  vis_hist.astype(np.uint8),
                     "proprio": prop_hist.astype(np.float32),
                     "actions": batch_actions,
+                    # decoding is only needed for the visualisation below
+                    "return_states": bool(args.visualize),
                 })
                 resp = socket.recv_pyobj()
                 latency = time.time() - t_req

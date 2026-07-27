@@ -108,7 +108,7 @@ def main():
 
                 sock.send_pyobj({"visual": vis.astype(np.uint8),
                                  "proprio": pro.astype(np.float32),
-                                 "actions": a})
+                                 "actions": a, "return_states": True})
                 r = sock.recv_pyobj()
                 if "error" in r:
                     print(f"  ep {ep} start {start}: server error {r['error']}")
