@@ -1,3 +1,4 @@
+import argparse
 import time
 import os
 import json
@@ -69,21 +70,43 @@ def apply_fixed_noise(pos, quat, gripper):
     return noisy_pos, quat, gripper
 
 def main():
+    global SOURCE_TASK_DIR, TARGET_TASK_DIR, N_EPISODES_TO_GENERATE
+    global NOISE_POS_STD, NOISE_ROT_STD
+
+    ap = argparse.ArgumentParser(description="Replay teleop episodes with injected noise.")
+    ap.add_argument("--n-episodes", type=int, default=N_EPISODES_TO_GENERATE)
+    ap.add_argument("--source-dir", default=SOURCE_TASK_DIR)
+    ap.add_argument("--target-dir", default=TARGET_TASK_DIR)
+    ap.add_argument("--noise-pos", type=float, default=NOISE_POS_STD,
+                    help="Position noise std in metres. NOTE: the historical default 0.007 "
+                         "is 7mm, though the comment beside it says 2mm (=0.002).")
+    ap.add_argument("--noise-rot", type=float, default=NOISE_ROT_STD)
+    args = ap.parse_args()
+    SOURCE_TASK_DIR = args.source_dir
+    TARGET_TASK_DIR = args.target_dir
+    N_EPISODES_TO_GENERATE = args.n_episodes
+    NOISE_POS_STD = args.noise_pos
+    NOISE_ROT_STD = args.noise_rot
+
     print(f"[REPLAY] Starting Noise Augmentation...")
     print(f"[CONFIG] Source: {SOURCE_TASK_DIR}")
     print(f"[CONFIG] Target: {TARGET_TASK_DIR}")
-    
+    print(f"[CONFIG] Episodes: {N_EPISODES_TO_GENERATE}")
+    print(f"[CONFIG] Noise: pos_std={NOISE_POS_STD} m ({NOISE_POS_STD*1000:.1f} mm), rot_std={NOISE_ROT_STD}")
+
     # 1. Initialize Interfaces
     robot = SimRobotInterface()
     gripper = SimGripperInterface()
-    
+
     # 2. Find Source Data
     traj_files = get_saved_trajectories(SOURCE_TASK_DIR)
     if not traj_files: return
     print(f"[REPLAY] Found {len(traj_files)} source trajectories.")
 
     # 3. Determine Start Index for New Data
-    current_idx = get_next_episode_id(SOURCE_TASK_DIR)
+    # Index off the TARGET, not the source: re-running must append rather than
+    # overwrite episodes already generated (an 8h job needs to be resumable).
+    current_idx = get_next_episode_id(TARGET_TASK_DIR)
     recorder = SimRecorder(current_idx, CAM1_SERIAL, CAM2_SERIAL, TARGET_TASK_DIR)
     print(f"[REPLAY] Writing new episodes starting at ID: {current_idx}")
 
@@ -196,8 +219,10 @@ def main():
                     failure_timestamp = actual_trajectory_data[-1]['timestamp']
                     failure_block = blk
 
-                # Preview
-                recorder.show_preview(is_recording=True)
+                # (No preview: show_preview belongs to cam.py's real-camera Recorder,
+                # not SimRecorder. Calling it here raised AttributeError, which the
+                # outer try/except swallowed -- so every episode failed silently and
+                # wrote zero frames.)
 
             # F. Finish Episode
             recorder.stop()
