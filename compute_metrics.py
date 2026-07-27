@@ -27,9 +27,22 @@ Labels JSON format — two formats accepted:
          "episode_002": {"outcome": "failure", "failure_step": 24}, ...}
 
 Metrics are computed at two levels:
-    episode-level: TP = failed episode where monitor triggered at least once
+    episode-level: TP = failed episode where monitor triggered at least once, at or
+                   before failure_step
     step-level:    steps within NUM_PRED of failure_step are labeled unsafe;
                    all steps in success episodes are safe (requires rich labels)
+
+Post-failure steps are dropped by default. generate_labels.py stops replaying at the
+first topple, but test_monitor.py keeps scoring to the end of the episode, so those
+extra steps observe a scene where the blocks are already down. Keeping them would:
+
+  - charge the monitor a false positive for correctly reporting that a collapsed
+    tower is unstable (depresses step-level precision), and
+  - credit a true positive to a monitor that never predicted the fall and only
+    reacted to the wreckage (inflates episode-level recall).
+
+Both make the metric measure observation rather than prediction, which is not the
+claim being evaluated. Pass --no-truncate to reproduce the old behaviour.
 """
 
 import argparse
@@ -51,6 +64,11 @@ def parse_args():
     p.add_argument("--labels",      required=True, help="Path to labels.json")
     p.add_argument("--n-thresholds", type=int, default=100)
     p.add_argument("--level",       choices=["episode", "step", "both"], default="both")
+    p.add_argument("--no-truncate", action="store_true",
+                   help="Keep steps recorded after failure_step. The labeler stops at the "
+                        "first topple while the monitor keeps scoring, so these steps observe "
+                        "an already-collapsed scene and are charged as false positives. Off by "
+                        "default; use this only to reproduce the old numbers.")
     return p.parse_args()
 
 
@@ -60,20 +78,39 @@ def load_scores(path):
     return data.get("scores", data), data.get("config", {})
 
 
-def compute_pr_curve(scores_by_ep, labels, n_thresh=100):
+def episode_max_scores(scores_by_ep, labels, failure_steps=None, truncate=True):
+    """Reduce each episode to one score: the max over steps the monitor could still act on.
+
+    generate_labels.py stops replaying at the first topple, but test_monitor.py keeps
+    scoring to the end of the episode. Those post-failure steps show a world where the
+    blocks are already down, so the world model legitimately reports high divergence.
+    Counting them turns the metric into "did the monitor notice the wreckage" rather than
+    "did it predict the fall". With truncate=True, failed episodes are cut at failure_step.
+
+    Success episodes have no failure_step and always use all their steps.
+    """
+    out = {}
+    for ep, step_scores in scores_by_ep.items():
+        if ep not in labels:
+            continue
+        fs = (failure_steps or {}).get(ep)
+        if truncate and fs is not None:
+            vals = [s for st, s in step_scores.items() if int(st) <= fs]
+        else:
+            vals = list(step_scores.values())
+        out[ep] = max(vals) if vals else 0.0
+    return out
+
+
+def compute_pr_curve(scores_by_ep, labels, n_thresh=100, failure_steps=None, truncate=True):
     """
     scores_by_ep: {ep_name: {step: score}}
     labels: {ep_name: 0|1}
     Returns thresholds, precision, recall arrays.
     """
-    # Collect all scores with labels
-    episode_max_scores = {}
-    for ep, step_scores in scores_by_ep.items():
-        if ep not in labels:
-            continue
-        episode_max_scores[ep] = max(step_scores.values()) if step_scores else 0.0
+    ep_max = episode_max_scores(scores_by_ep, labels, failure_steps, truncate)
 
-    all_scores = list(episode_max_scores.values())
+    all_scores = list(ep_max.values())
     if not all_scores:
         return np.array([]), np.array([]), np.array([])
 
@@ -82,7 +119,7 @@ def compute_pr_curve(scores_by_ep, labels, n_thresh=100):
 
     for thresh in thresholds:
         tp = fp = tn = fn = 0
-        for ep, max_score in episode_max_scores.items():
+        for ep, max_score in ep_max.items():
             label = labels[ep]
             triggered = max_score > thresh
             if label == 1 and triggered:     tp += 1
@@ -98,9 +135,10 @@ def compute_pr_curve(scores_by_ep, labels, n_thresh=100):
     return thresholds, np.array(precisions), np.array(recalls)
 
 
-def best_f1_metrics(scores_by_ep, labels, n_thresh=100):
+def best_f1_metrics(scores_by_ep, labels, n_thresh=100, failure_steps=None, truncate=True):
     """Returns dict of metrics at the threshold with best F1."""
-    thresholds, precisions, recalls = compute_pr_curve(scores_by_ep, labels, n_thresh)
+    thresholds, precisions, recalls = compute_pr_curve(
+        scores_by_ep, labels, n_thresh, failure_steps, truncate)
 
     if len(thresholds) == 0:
         return {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0, "threshold": 0}
@@ -110,13 +148,10 @@ def best_f1_metrics(scores_by_ep, labels, n_thresh=100):
     best_thresh = thresholds[best_idx]
 
     # Recompute full metrics at best threshold
-    episode_max_scores = {
-        ep: max(step_scores.values()) if step_scores else 0.0
-        for ep, step_scores in scores_by_ep.items() if ep in labels
-    }
+    ep_max = episode_max_scores(scores_by_ep, labels, failure_steps, truncate)
 
     tp = fp = tn = fn = 0
-    for ep, max_score in episode_max_scores.items():
+    for ep, max_score in ep_max.items():
         label = labels[ep]
         triggered = max_score > best_thresh
         if label == 1 and triggered:       tp += 1
@@ -135,15 +170,22 @@ def best_f1_metrics(scores_by_ep, labels, n_thresh=100):
     }
 
 
-def step_level_metrics(scores_by_ep, labels, threshold, n_thresh=100, failure_steps=None, num_pred=8):
+def step_level_metrics(scores_by_ep, labels, threshold, n_thresh=100, failure_steps=None,
+                       num_pred=8, truncate=True):
     """
     Assigns per-step labels then finds the best-F1 threshold.
 
     If failure_steps is provided (from generate_labels.py), only the window of steps
     immediately before the failure are labeled unsafe (more precise than labeling the
     entire failed episode). Otherwise every step in a failed episode is labeled unsafe.
+
+    With truncate=True, steps *after* failure_step are dropped entirely rather than being
+    labeled safe. The labeler stops at the first topple but the monitor keeps scoring, so
+    those steps observe an already-collapsed scene; scoring them high is correct behaviour
+    and must not be charged as a false positive.
     """
     step_preds = []  # (label, score) pairs
+    n_dropped = 0
     for ep, step_scores in scores_by_ep.items():
         if ep not in labels:
             continue
@@ -152,12 +194,18 @@ def step_level_metrics(scores_by_ep, labels, threshold, n_thresh=100, failure_st
 
         for step_str, score in step_scores.items():
             step = int(step_str)
+            if truncate and fs is not None and step > fs:
+                n_dropped += 1
+                continue
             if ep_label == 1 and fs is not None:
                 # Only the window of chunks up to num_pred steps before failure are unsafe
                 step_label = 1 if (fs - num_pred) <= step <= fs else 0
             else:
                 step_label = ep_label
             step_preds.append((step_label, score))
+
+    if n_dropped:
+        print(f"  (dropped {n_dropped} post-failure steps; pass --no-truncate to keep them)")
 
     if not step_preds:
         return {}
@@ -251,7 +299,9 @@ def main():
     if args.level in ("episode", "both"):
         ep_results = {}
         for mode, scores_by_ep, config in entries:
-            ep_results[mode] = best_f1_metrics(scores_by_ep, labels, args.n_thresholds)
+            ep_results[mode] = best_f1_metrics(
+                scores_by_ep, labels, args.n_thresholds,
+                failure_steps=failure_steps, truncate=not args.no_truncate)
         print_table(ep_results, "episode")
 
     if args.level in ("step", "both"):
@@ -262,6 +312,7 @@ def main():
                 scores_by_ep, labels, thresh, args.n_thresholds,
                 failure_steps=failure_steps,
                 num_pred=config.get("num_pred", 8),
+                truncate=not args.no_truncate,
             )
         print_table(step_results, "step")
 
