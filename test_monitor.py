@@ -55,6 +55,8 @@ def parse_args():
                    help="Aggregation method over temporal window")
     p.add_argument("--ema-alpha",       type=float, default=0.6,
                    help="Alpha for EMA temporal aggregation")
+    p.add_argument("--max-episodes",    type=int, default=None,
+                   help="Only evaluate the first N episodes (quick validation runs)")
     p.add_argument("--output-dir",      default="results/monitor")
     p.add_argument("--visualize",       action="store_true",
                    help="Save visualization images for triggered steps")
@@ -127,6 +129,8 @@ def main():
     with env.begin() as txn:
         metadata = pickle.loads(txn.get(b"__metadata__"))
         ep_names = list(metadata["episodes"].keys())
+        if args.max_episodes:
+            ep_names = ep_names[:args.max_episodes]
         print(f"Evaluating {len(ep_names)} episodes...")
 
         for ep_idx, ep_name in enumerate(ep_names):

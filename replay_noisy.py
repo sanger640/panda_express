@@ -10,7 +10,7 @@ import traceback
 import shutil
 
 # Import interfaces directly from sim.py
-from sim import SimRobotInterface, SimGripperInterface, SimRecorder, SIM
+from sim import SimRobotInterface, SimGripperInterface, SimRecorder, SIM, TOPPLE_THRESHOLD_DEG
 
 # --- CONFIGURATION ---
 SOURCE_TASK_DIR = "tasks/jenga_mujoco/"
@@ -133,6 +133,10 @@ def main():
             
             # E. Execute & Record Ground Truth
             actual_trajectory_data = []
+            failure_step = None
+            failure_timestamp = None
+            failure_block = None
+            peak_tilt, peak_block = 0.0, None
             
             start_real_time = time.time()
             start_sim_time = noisy_plan[0]['original_timestamp']
@@ -178,6 +182,20 @@ def main():
                     'gripper': actual_grip_bool
                 })
 
+                # Ground truth for THIS rollout, captured as it happens.
+                # Without this the outcome is lost and has to be reconstructed later by
+                # re-simulating from a fresh random reset -- which produces a different
+                # rollout than the frames recorded here, so the label would not describe
+                # the trajectory the monitor is scored on.
+                with SIM.lock:
+                    failed, blk, tilt = SIM.check_failure()
+                if tilt > peak_tilt:
+                    peak_tilt, peak_block = float(tilt), blk or peak_block
+                if failed and failure_step is None:
+                    failure_step = len(actual_trajectory_data) - 1
+                    failure_timestamp = actual_trajectory_data[-1]['timestamp']
+                    failure_block = blk
+
                 # Preview
                 recorder.show_preview(is_recording=True)
 
@@ -195,7 +213,17 @@ def main():
                     'source_episode': source_file,
                     'num_waypoints': len(actual_trajectory_data),
                     'noise_injected': True,
-                    'noise_params': {'pos_std': NOISE_POS_STD, 'rot_std': NOISE_ROT_STD}
+                    'noise_params': {'pos_std': NOISE_POS_STD, 'rot_std': NOISE_ROT_STD},
+                    # Ground truth for exactly this rollout -- no re-simulation needed.
+                    # failure_step indexes `waypoints`; failure_timestamp lets the LMDB
+                    # builder re-align it after timestamp matching drops any waypoints.
+                    'outcome': 'failure' if failure_step is not None else 'success',
+                    'failure_step': failure_step,
+                    'failure_timestamp': failure_timestamp,
+                    'failure_block': failure_block,
+                    'peak_tilt_deg': round(peak_tilt, 3),
+                    'peak_block': peak_block,
+                    'topple_threshold_deg': TOPPLE_THRESHOLD_DEG,
                 },
                 'waypoints': actual_trajectory_data
             }

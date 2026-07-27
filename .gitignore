@@ -10,3 +10,10 @@ __pycache__/
 
 # failure-check visualisation artifacts
 results/
+
+# datasets and generated artifacts (never commit; multi-GB)
+tasks/
+*.lmdb/
+*.mdb
+*.tar
+*.tar.gz
