@@ -3,14 +3,14 @@ Render close-up frames around the moment the automatic failure check fires.
 
 Companion to visualize_failure_check.py. That script proves the checker runs; this one
 lets you eyeball *what it saw* at the instant it fired, using a free camera zoomed on the
-three blocks (the scene's cam_fixed sits too far back to judge a 15 deg tilt by eye).
+three blocks (the scene's cam_fixed sits too far back to judge tilt by eye).
 
 For each episode it emits a montage: several steps before detection, the detection frame,
 and several after -- each annotated with the live per-block tilt and the verdict.
 
 Usage:
     python failure_frames.py --episodes 1 2 --speed 3
-    python failure_frames.py --episodes 2 --threshold 15 --output-dir results/failure_frames
+    python failure_frames.py --episodes 2 --threshold 45 --output-dir results/failure_frames
 """
 
 import argparse
@@ -25,7 +25,7 @@ import numpy as np
 import torch
 import mujoco
 
-from sim import SimRobotInterface, SimGripperInterface, SIM
+from sim import SimRobotInterface, SimGripperInterface, SIM, TOPPLE_THRESHOLD_DEG
 
 BLOCKS = ["block_left", "block_middle", "block_right"]
 TRACKED = ["block_left", "block_right"]          # what check_failure actually watches
@@ -35,7 +35,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--source-dir",  default="tasks/jenga_mujoco/episodes")
     p.add_argument("--episodes",    nargs="+", default=["2"])
-    p.add_argument("--threshold",   type=float, default=15.0)
+    p.add_argument("--threshold",   type=float, default=TOPPLE_THRESHOLD_DEG)
     p.add_argument("--speed",       type=float, default=3.0)
     p.add_argument("--settle",      type=float, default=0.5)
     p.add_argument("--width",       type=int, default=520)

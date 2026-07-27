@@ -14,7 +14,7 @@ Usage:
     python generate_labels.py \
         --lmdb tasks/jenga_mujoco_noise/jenga_single.lmdb \
         --output labels.json \
-        --topple-threshold 15.0 \
+        --topple-threshold 45.0 \
         --n-replays 3
 
     --n-replays N: replay each episode N times and take majority vote (reduces stochasticity)
@@ -29,7 +29,7 @@ import pickle
 import numpy as np
 import torch
 
-from sim import SimRobotInterface, SimGripperInterface, SIM
+from sim import SimRobotInterface, SimGripperInterface, SIM, TOPPLE_THRESHOLD_DEG
 
 
 ACTION_HZ = 10           # actions in LMDB are at 10 Hz
@@ -41,7 +41,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--lmdb",             required=True)
     p.add_argument("--output",           default="labels.json")
-    p.add_argument("--topple-threshold", type=float, default=15.0,
+    p.add_argument("--topple-threshold", type=float, default=TOPPLE_THRESHOLD_DEG,
                    help="Tilt angle in degrees that counts as a topple")
     p.add_argument("--n-replays",        type=int, default=3,
                    help="Replays per episode for majority-vote labeling")

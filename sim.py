@@ -13,6 +13,15 @@ import cv2
 from scipy.spatial.transform import Rotation as R
 import torch
 import mujoco.gl_context
+
+# A block is "toppled" only once it is lying flat, not merely leaning. Measured peak
+# tilt across episodes is strongly bimodal: blocks either stay under ~16 deg (standing,
+# possibly nudged) or go to ~95 deg (flat), with nothing in between. Any threshold in
+# 20-75 deg yields the same verdict; 45 sits in the middle of that dead zone.
+# See survey_tilts.py and RESUME.md 5b.
+TOPPLE_THRESHOLD_DEG = 45.0
+
+
 class SimContext:
     def __init__(self):
         self.model = mujoco.MjModel.from_xml_path("franka_emika_panda/panda_jenga_setup.xml")
@@ -29,7 +38,8 @@ class SimContext:
         self.running = True
 
         self._ref_quats = {}
-        self._record_ref_quats()  # store upright quaternions before any noise is applied
+        self._ref_axis_tilt = {}
+        self._record_ref_quats()  # store upright reference before any noise is applied
 
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         self.thread = threading.Thread(target=self._physics_loop, daemon=True)
@@ -70,9 +80,11 @@ class SimContext:
             print("[SIM] Scene reset with random variation applied.")
 
     def _record_ref_quats(self):
-        """Store post-reset quaternions for the two adjacent blocks (left and right).
+        """Store post-reset reference state for the two adjacent blocks (left and right).
+
         Called after every reset so tilts are measured relative to the actual starting pose,
-        not the XML default — this accounts for the random rotation noise applied at reset."""
+        not the XML default. Records both the reference quaternion (kept for reference) and
+        the reference tilt-from-vertical, which is what get_block_tilt actually uses."""
         for name in ["block_left", "block_right"]:
             body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
             if body_id == -1:
@@ -81,21 +93,32 @@ class SimContext:
             qpos_adr = self.model.jnt_qposadr[joint_id]
             if qpos_adr != -1:
                 self._ref_quats[name] = self.data.qpos[qpos_adr + 3:qpos_adr + 7].copy()
+            self._ref_axis_tilt[name] = self._axis_tilt(name)
+
+    def _axis_tilt(self, block_name):
+        """Absolute angle between the block's own z-axis and world z, in degrees.
+
+        This is the physically meaningful notion of "tipping": it ignores rotation about the
+        vertical (yaw), so a block that slides or spins while staying upright reads ~0. The
+        reset noise is pure yaw (see reset_simulation), so this measure is unaffected by it."""
+        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, block_name)
+        if body_id == -1:
+            return 0.0
+        rot = self.data.xmat[body_id].reshape(3, 3)
+        return float(np.degrees(np.arccos(np.clip(rot[2, 2], -1.0, 1.0))))
 
     def get_block_tilt(self, block_name):
-        """Returns tilt in degrees from the reference upright quaternion recorded at last reset."""
-        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, block_name)
-        if body_id == -1 or block_name not in self._ref_quats:
-            return 0.0
-        joint_id = self.model.body_jntadr[body_id]
-        qpos_adr = self.model.jnt_qposadr[joint_id]
-        curr = self.data.qpos[qpos_adr + 3:qpos_adr + 7]   # (w,x,y,z)
-        ref  = self._ref_quats[block_name]
-        # Angular distance between two quaternions: 2*arccos(|q1 · q2|)
-        dot = float(np.clip(abs(np.dot(curr, ref)), 0.0, 1.0))
-        return float(np.degrees(2.0 * np.arccos(dot)))
+        """Returns how far the block has tipped from vertical since the last reset, in degrees.
 
-    def check_failure(self, threshold_deg=15.0):
+        Measured as tilt-from-vertical rather than full quaternion distance, so pure yaw
+        (a block sliding or spinning while still standing) does not count as tipping. The
+        previous quaternion-geodesic version registered ~10 deg of spurious tilt on blocks
+        that never left vertical, which mattered when the threshold was 15 deg."""
+        if block_name not in self._ref_axis_tilt:
+            return 0.0
+        return abs(self._axis_tilt(block_name) - self._ref_axis_tilt[block_name])
+
+    def check_failure(self, threshold_deg=TOPPLE_THRESHOLD_DEG):
         """Check whether any adjacent block has toppled beyond threshold_deg.
 
         Returns:

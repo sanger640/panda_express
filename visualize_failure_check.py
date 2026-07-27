@@ -16,7 +16,7 @@ Outputs per episode:
 
 Usage:
     python visualize_failure_check.py --episodes 1 2 3 --speed 4
-    python visualize_failure_check.py --n 5 --topple-threshold 15.0
+    python visualize_failure_check.py --n 5 --topple-threshold 45.0
 """
 
 import argparse
@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 import mujoco
 
 # Importing sim launches the passive viewer and the physics thread.
-from sim import SimRobotInterface, SimGripperInterface, SIM
+from sim import SimRobotInterface, SimGripperInterface, SIM, TOPPLE_THRESHOLD_DEG
 
 
 BLOCKS = ["block_left", "block_right"]
@@ -50,7 +50,7 @@ def parse_args():
                    help="Explicit episode ids, e.g. --episodes 1 7 42")
     p.add_argument("--n",                type=int, default=3,
                    help="If --episodes not given, replay the first N usable episodes")
-    p.add_argument("--topple-threshold", type=float, default=15.0)
+    p.add_argument("--topple-threshold", type=float, default=TOPPLE_THRESHOLD_DEG)
     p.add_argument("--speed",            type=float, default=4.0,
                    help="Playback speed multiplier (1.0 = original real-time)")
     p.add_argument("--settle",           type=float, default=0.5,
