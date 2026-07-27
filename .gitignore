@@ -7,3 +7,6 @@ test_results/
 tasks/jenga_mujoco_noise/jenga_single.lmdb/lock.mdb
 tasks/jenga_mujoco_noise/jenga_single.lmdb/data.mdb
 __pycache__/
+
+# failure-check visualisation artifacts
+results/
