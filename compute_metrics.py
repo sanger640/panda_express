@@ -89,7 +89,35 @@ def parse_args():
 def load_scores(path):
     with open(path) as f:
         data = json.load(f)
-    return data.get("scores", data), data.get("config", {})
+    return sanitize(data.get("scores", data)), data.get("config", {})
+
+
+def sanitize(scores_by_ep):
+    """Map non-finite chunk scores onto the finite minimum.
+
+    le_cos() masks patches whose end-distance falls under a 1e-3 noise floor, and returns
+    -inf for a perturbation where *every* patch is masked. With small deviator noise this
+    happens for real: at sigma=0.002 about 1.4% of chunks come back -inf. Semantically that
+    is "no patch showed significant drift", i.e. maximally safe, so the finite minimum is
+    the right stand-in. Left raw, a single -inf makes np.linspace produce all-NaN thresholds
+    and silently zeroes every metric.
+    """
+    vals = [v for s in scores_by_ep.values() for v in s.values()]
+    finite = [v for v in vals if np.isfinite(v)]
+    if not finite or len(finite) == len(vals):
+        return scores_by_ep
+    lo = min(finite)
+    n = 0
+    out = {}
+    for ep, steps in scores_by_ep.items():
+        out[ep] = {}
+        for k, v in steps.items():
+            if not np.isfinite(v):
+                v = lo
+                n += 1
+            out[ep][k] = v
+    print(f"  note: {n} non-finite chunk score(s) mapped to the finite minimum ({lo:.3f})")
+    return out
 
 
 def chunk_bounds(fs, num_hist, num_pred, window="predictive"):
