@@ -198,11 +198,19 @@ def main():
                 # If SIM.gripper_val is small (near 0), it's closed
                 actual_grip_bool = SIM.gripper_val < 10.0
 
+                # Schema must match the teleop episodes, which create_lmdb_*.py reads as:
+                #   action  <- position / gripper           (what was commanded)
+                #   proprio <- proc_pos / proc_gripper      (what the robot actually reached)
+                # Recording only the achieved pose left proc_* missing, so process_episode
+                # raised KeyError into its bare except and silently dropped every episode.
                 actual_trajectory_data.append({
                     'timestamp': time.time(),
-                    'position': curr_pos_tensor.numpy().tolist(),
-                    'orientation': curr_quat_tensor.numpy().tolist(),
-                    'gripper': actual_grip_bool
+                    'position': np.asarray(step['target_pos']).tolist(),
+                    'orientation': np.asarray(step['target_quat']).tolist(),
+                    'gripper': bool(is_closed),
+                    'proc_pos': curr_pos_tensor.numpy().tolist(),
+                    'proc_quat': curr_quat_tensor.numpy().tolist(),
+                    'proc_gripper': actual_grip_bool,
                 })
 
                 # Ground truth for THIS rollout, captured as it happens.
