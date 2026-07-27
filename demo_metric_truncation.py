@@ -1,9 +1,17 @@
 """
-Worked example: why post-failure steps must be dropped before scoring the monitor.
+Worked example: how the monitor metrics treat prediction vs observation.
+
+============================================================================
+THE NUMBERS THIS PRINTS ARE NOT MEASUREMENTS. The scores below are invented,
+hand-picked to isolate the effect of each correction. They say nothing about
+the Jenga task, the world model, or the monitor's real accuracy. This is a
+regression check on the arithmetic in compute_metrics.py, nothing more.
+Real numbers require a world model checkpoint and a run of test_monitor.py.
+============================================================================
 
 Builds a tiny synthetic labels.json + scores.json in a temp dir and runs compute_metrics.py
-twice -- once with the current (correct) behaviour, once with --no-truncate -- so the effect
-is visible in isolation, without needing a world model checkpoint or an LMDB.
+three times -- current defaults, legacy label window, and fully-old behaviour -- so each
+correction is visible in isolation, without needing a checkpoint or an LMDB.
 
     python demo_metric_truncation.py
 
@@ -39,14 +47,18 @@ LABELS = {
     "ep_05": {"outcome": "success", "failure_step": None, "vote": "0/3"},
 }
 
-# Chunks are num_pred=8 apart, matching test_monitor.py's stride.
+# Chunks are num_pred=8 apart, matching test_monitor.py's stride. With num_hist=3 and
+# num_pred=8 the predictive chunk for a failure at fs is the one in [fs-10, fs-3]:
+#     ep_01 fs=40 -> chunk 32     ep_02 fs=24 -> chunk 16     ep_06 fs=32 -> chunk 24
+# ep_01/ep_02 spike on exactly that chunk (real forecast). ep_06 stays flat there and only
+# spikes at fs itself, where the topple is already inside its observation window.
 SCORES = {
-    "ep_01": {"0": .30, "8": .35, "16": .40, "24": .45, "32": .60, "40": 1.20,
-              "48": 2.10, "56": 2.40, "64": 2.30},
-    "ep_02": {"0": .30, "8": .40, "16": .50, "24": 1.10,
-              "32": 2.00, "40": 2.20, "48": 2.50, "56": 2.30},
-    "ep_06": {"0": .30, "8": .35, "16": .40, "24": .42, "32": .45,
-              "40": 2.20, "48": 2.40, "56": 2.35},
+    "ep_01": {"0": .30, "8": .35, "16": .40, "24": .45, "32": 1.20,
+              "40": 2.10, "48": 2.40, "56": 2.30},
+    "ep_02": {"0": .30, "8": .40, "16": 1.10,
+              "24": 2.00, "32": 2.20, "40": 2.50, "48": 2.30},
+    "ep_06": {"0": .30, "8": .35, "16": .40, "24": .45,
+              "32": 2.20, "40": 2.40, "48": 2.35},
     "ep_03": {"0": .30, "8": .35, "16": .45, "24": .70, "32": .55, "40": .40, "48": .35},
     "ep_04": {"0": .32, "8": .38, "16": .90, "24": .60, "32": .42, "40": .38, "48": .36},
     "ep_05": {"0": .28, "8": .31, "16": .35, "24": .50, "32": .44, "40": .33, "48": .30},
@@ -62,8 +74,11 @@ def main():
              "scores": SCORES}, indent=2))
 
         for title, extra in [
-            ("CORRECT — post-failure steps dropped (default)", []),
-            ("OLD — post-failure steps kept (--no-truncate)", ["--no-truncate"]),
+            ("CURRENT — predictive window, post-failure chunks dropped (defaults)", []),
+            ("LEGACY WINDOW — also credits the chunk watching the topple",
+             ["--label-window", "legacy"]),
+            ("FULLY OLD — legacy window and post-failure chunks kept",
+             ["--label-window", "legacy", "--no-truncate"]),
         ]:
             print("\n" + "#" * 72)
             print("#  " + title)
@@ -77,21 +92,30 @@ def main():
             )
 
     print("""
-What to look at
----------------
-EPISODE level, recall: 66.7% correct vs 100.0% old.
-    ep_06 never flagged the fall -- it only lit up at step 40, after the topple at 32.
-    Keeping those steps lets its post-collapse score satisfy the trigger, so the old
-    path books a true positive for an episode the monitor completely missed. A monitor
-    that reports failures after they happen has no safety value; recall must not reward it.
+What to look at  (again: invented scores, not measurements)
+-----------------------------------------------------------
+ep_06 is the episode that matters. Its monitor stayed flat at 0.45 on chunk 24 -- the only
+chunk that could have forecast the topple at step 32 -- and then jumped to 2.20 on chunk 32,
+which already has the topple inside its 3-frame observation window. It predicted nothing; it
+merely reported what it could see.
 
-STEP level, precision: 40.0% correct vs 24.0% old.
-    The post-failure steps in ep_01/02/06 all score high. Labeled "safe" and kept, each
-    becomes a false positive -- the monitor is charged for correctly noticing that a
-    collapsed tower is unstable. Dropping them nearly doubles precision here.
+  CURRENT (predictive window, chunks dropped past the cutoff)
+      ep_06 is judged on chunk 24 only -> 0.45, below any useful threshold -> counted as a
+      miss. Recall 66.7%: two of three failures genuinely forecast. This is the honest number.
 
-Both distortions push in the flattering direction for recall and the punishing direction
-for precision, so they do not cancel: they distort the precision/recall trade-off itself.
+  LEGACY WINDOW
+      The unsafe window widens to [fs-8, fs], so chunk 32 now counts as a detection
+      opportunity for ep_06 -- and it scores 2.20. Recall jumps to 100%. The monitor is
+      credited for watching a block fall over.
+
+  FULLY OLD
+      Post-failure chunks return as well. Episode metrics read a flawless 100% across the
+      board, while step-level precision drops to 24% because every post-collapse chunk is
+      labeled safe and scored high, each one booked as a false alarm.
+
+The two errors push opposite ways -- recall flattered, precision punished -- so they do not
+cancel out. They distort the precision/recall trade-off itself, which is the axis the
+ablation table compares modes along.
 """)
 
 

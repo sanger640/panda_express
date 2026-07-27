@@ -26,23 +26,32 @@ Labels JSON format — two formats accepted:
         {"episode_001": {"outcome": "success", "failure_step": null},
          "episode_002": {"outcome": "failure", "failure_step": 24}, ...}
 
-Metrics are computed at two levels:
-    episode-level: TP = failed episode where monitor triggered at least once, at or
-                   before failure_step
-    step-level:    steps within NUM_PRED of failure_step are labeled unsafe;
-                   all steps in success episodes are safe (requires rich labels)
+Note that scores.json is keyed by *chunk start index*, not by timestep: test_monitor.py
+strides by num_pred, so there is one score per 8 timesteps, not one per timestep. What is
+called "step-level" below is really chunk-level.
 
-Post-failure steps are dropped by default. generate_labels.py stops replaying at the
-first topple, but test_monitor.py keeps scoring to the end of the episode, so those
-extra steps observe a scene where the blocks are already down. Keeping them would:
+Metrics are computed at two levels, and both are reported by default:
+    episode-level: TP = failed episode where the monitor triggered at least once within
+                   the window where it could still have acted
+    step-level:    chunks that genuinely forecast the topple are labeled unsafe; all
+                   chunks in success episodes are safe (requires rich labels)
 
-  - charge the monitor a false positive for correctly reporting that a collapsed
-    tower is unstable (depresses step-level precision), and
-  - credit a true positive to a monitor that never predicted the fall and only
-    reacted to the wreckage (inflates episode-level recall).
+Two corrections are applied by default, both aimed at measuring *prediction* rather than
+*observation*. generate_labels.py stops replaying at the first topple, but test_monitor.py
+keeps scoring to the end of the episode, so later chunks observe a scene where the blocks
+are already down:
 
-Both make the metric measure observation rather than prediction, which is not the
-claim being evaluated. Pass --no-truncate to reproduce the old behaviour.
+  - Chunks past the cutoff are dropped (--no-truncate keeps them). Otherwise the monitor
+    is charged a false positive for correctly reporting that a collapsed tower is
+    unstable, and a monitor that never predicted the fall but spiked afterwards is
+    credited a true positive.
+
+  - The unsafe window counts only chunks whose observations end before the topple and
+    whose prediction horizon still reaches it (--label-window legacy restores the old
+    window). Otherwise the chunk that is *watching* the topple happen counts as a
+    detection, which rewards observation rather than forecasting.
+
+See chunk_bounds() for the exact index arithmetic.
 """
 
 import argparse
@@ -64,6 +73,11 @@ def parse_args():
     p.add_argument("--labels",      required=True, help="Path to labels.json")
     p.add_argument("--n-thresholds", type=int, default=100)
     p.add_argument("--level",       choices=["episode", "step", "both"], default="both")
+    p.add_argument("--label-window", choices=["predictive", "legacy"], default="predictive",
+                   help="Which scored chunks count as unsafe. 'predictive' (default) counts "
+                        "only chunks whose observations end before the topple and whose "
+                        "horizon still reaches it. 'legacy' also credits the chunk that is "
+                        "watching the topple happen. See chunk_bounds().")
     p.add_argument("--no-truncate", action="store_true",
                    help="Keep steps recorded after failure_step. The labeler stops at the "
                         "first topple while the monitor keeps scoring, so these steps observe "
@@ -78,37 +92,65 @@ def load_scores(path):
     return data.get("scores", data), data.get("config", {})
 
 
-def episode_max_scores(scores_by_ep, labels, failure_steps=None, truncate=True):
-    """Reduce each episode to one score: the max over steps the monitor could still act on.
+def chunk_bounds(fs, num_hist, num_pred, window="predictive"):
+    """Which scored chunks count as unsafe, and where to stop scoring, for a failure at fs.
+
+    test_monitor.py strides by num_pred, so scores.json is keyed by chunk start index, not
+    by timestep. A chunk at `start` observes [start, start+num_hist-1] and predicts
+    [start+num_hist, start+num_hist+num_pred-1].
+
+    "predictive" (default) counts only chunks that genuinely forecast the topple: their
+    observations end strictly before fs, and their prediction horizon still reaches it.
+
+        observations end before failure:  start + num_hist - 1 <  fs  -> start <= fs - num_hist
+        horizon reaches failure:          start + num_hist + num_pred - 1 >= fs
+                                                                       -> start >= fs - num_hist - num_pred + 1
+
+    Chunks past the cutoff already have the topple inside their observation window, so a
+    high score there is observation rather than prediction; they are dropped rather than
+    counted as false positives.
+
+    "legacy" reproduces the original window, (fs - num_pred) <= start <= fs, which also
+    credits the chunk that is watching the topple happen.
+
+    Returns (lo, hi, cutoff): chunks in [lo, hi] are unsafe, chunks with start > cutoff dropped.
+    """
+    if window == "legacy":
+        return fs - num_pred, fs, fs
+    return fs - num_hist - num_pred + 1, fs - num_hist, fs - num_hist
+
+
+def episode_max_scores(scores_by_ep, labels, cutoffs=None, truncate=True):
+    """Reduce each episode to one score: the max over chunks the monitor could still act on.
 
     generate_labels.py stops replaying at the first topple, but test_monitor.py keeps
-    scoring to the end of the episode. Those post-failure steps show a world where the
-    blocks are already down, so the world model legitimately reports high divergence.
-    Counting them turns the metric into "did the monitor notice the wreckage" rather than
-    "did it predict the fall". With truncate=True, failed episodes are cut at failure_step.
+    scoring to the end of the episode. Those later chunks show a world where the blocks are
+    already down, so the world model legitimately reports high divergence. Counting them
+    turns the metric into "did the monitor notice the wreckage" rather than "did it predict
+    the fall". With truncate=True, failed episodes are cut at their cutoff.
 
-    Success episodes have no failure_step and always use all their steps.
+    Success episodes have no failure step and always use all their chunks.
     """
     out = {}
     for ep, step_scores in scores_by_ep.items():
         if ep not in labels:
             continue
-        fs = (failure_steps or {}).get(ep)
-        if truncate and fs is not None:
-            vals = [s for st, s in step_scores.items() if int(st) <= fs]
+        cut = (cutoffs or {}).get(ep)
+        if truncate and cut is not None:
+            vals = [s for st, s in step_scores.items() if int(st) <= cut]
         else:
             vals = list(step_scores.values())
         out[ep] = max(vals) if vals else 0.0
     return out
 
 
-def compute_pr_curve(scores_by_ep, labels, n_thresh=100, failure_steps=None, truncate=True):
+def compute_pr_curve(scores_by_ep, labels, n_thresh=100, cutoffs=None, truncate=True):
     """
     scores_by_ep: {ep_name: {step: score}}
     labels: {ep_name: 0|1}
     Returns thresholds, precision, recall arrays.
     """
-    ep_max = episode_max_scores(scores_by_ep, labels, failure_steps, truncate)
+    ep_max = episode_max_scores(scores_by_ep, labels, cutoffs, truncate)
 
     all_scores = list(ep_max.values())
     if not all_scores:
@@ -135,10 +177,10 @@ def compute_pr_curve(scores_by_ep, labels, n_thresh=100, failure_steps=None, tru
     return thresholds, np.array(precisions), np.array(recalls)
 
 
-def best_f1_metrics(scores_by_ep, labels, n_thresh=100, failure_steps=None, truncate=True):
+def best_f1_metrics(scores_by_ep, labels, n_thresh=100, cutoffs=None, truncate=True):
     """Returns dict of metrics at the threshold with best F1."""
     thresholds, precisions, recalls = compute_pr_curve(
-        scores_by_ep, labels, n_thresh, failure_steps, truncate)
+        scores_by_ep, labels, n_thresh, cutoffs, truncate)
 
     if len(thresholds) == 0:
         return {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0, "threshold": 0}
@@ -148,7 +190,7 @@ def best_f1_metrics(scores_by_ep, labels, n_thresh=100, failure_steps=None, trun
     best_thresh = thresholds[best_idx]
 
     # Recompute full metrics at best threshold
-    ep_max = episode_max_scores(scores_by_ep, labels, failure_steps, truncate)
+    ep_max = episode_max_scores(scores_by_ep, labels, cutoffs, truncate)
 
     tp = fp = tn = fn = 0
     for ep, max_score in ep_max.items():
@@ -170,19 +212,16 @@ def best_f1_metrics(scores_by_ep, labels, n_thresh=100, failure_steps=None, trun
     }
 
 
-def step_level_metrics(scores_by_ep, labels, threshold, n_thresh=100, failure_steps=None,
-                       num_pred=8, truncate=True):
+def step_level_metrics(scores_by_ep, labels, threshold, n_thresh=100, windows=None,
+                       truncate=True):
     """
-    Assigns per-step labels then finds the best-F1 threshold.
+    Assigns per-chunk labels then finds the best-F1 threshold.
 
-    If failure_steps is provided (from generate_labels.py), only the window of steps
-    immediately before the failure are labeled unsafe (more precise than labeling the
-    entire failed episode). Otherwise every step in a failed episode is labeled unsafe.
-
-    With truncate=True, steps *after* failure_step are dropped entirely rather than being
-    labeled safe. The labeler stops at the first topple but the monitor keeps scoring, so
-    those steps observe an already-collapsed scene; scoring them high is correct behaviour
-    and must not be charged as a false positive.
+    `windows` maps episode -> (lo, hi, cutoff) from chunk_bounds(), computed only for failed
+    episodes with a known failure step. Chunks in [lo, hi] are unsafe; chunks past `cutoff`
+    are dropped (they observe an already-collapsed scene, so scoring them high is correct
+    behaviour and must not be charged as a false positive). Episodes without an entry fall
+    back to their episode label for every chunk.
     """
     step_preds = []  # (label, score) pairs
     n_dropped = 0
@@ -190,16 +229,16 @@ def step_level_metrics(scores_by_ep, labels, threshold, n_thresh=100, failure_st
         if ep not in labels:
             continue
         ep_label = labels[ep]
-        fs = (failure_steps or {}).get(ep)
+        bounds = (windows or {}).get(ep)
 
         for step_str, score in step_scores.items():
             step = int(step_str)
-            if truncate and fs is not None and step > fs:
-                n_dropped += 1
-                continue
-            if ep_label == 1 and fs is not None:
-                # Only the window of chunks up to num_pred steps before failure are unsafe
-                step_label = 1 if (fs - num_pred) <= step <= fs else 0
+            if bounds is not None:
+                lo, hi, cut = bounds
+                if truncate and step > cut:
+                    n_dropped += 1
+                    continue
+                step_label = 1 if lo <= step <= hi else 0
             else:
                 step_label = ep_label
             step_preds.append((step_label, score))
@@ -296,12 +335,31 @@ def main():
         print("No score files found.")
         return
 
+    # Per-mode chunk windows: num_hist/num_pred come from the scores.json config, since
+    # they determine which chunk could actually have predicted the failure.
+    windows_for = {}
+    for mode, _, config in entries:
+        nh = config.get("num_hist", 3)
+        npd = config.get("num_pred", 8)
+        windows_for[mode] = {
+            ep: chunk_bounds(fs, nh, npd, args.label_window)
+            for ep, fs in failure_steps.items()
+        }
+    if failure_steps:
+        nh = entries[0][2].get("num_hist", 3)
+        npd = entries[0][2].get("num_pred", 8)
+        ex_ep, ex_fs = next(iter(failure_steps.items()))
+        lo, hi, cut = chunk_bounds(ex_fs, nh, npd, args.label_window)
+        print(f"Label window '{args.label_window}' (num_hist={nh}, num_pred={npd}): "
+              f"e.g. {ex_ep} fails at {ex_fs} -> unsafe chunks [{lo}, {hi}], drop start > {cut}")
+
     if args.level in ("episode", "both"):
         ep_results = {}
         for mode, scores_by_ep, config in entries:
+            cutoffs = {ep: b[2] for ep, b in windows_for[mode].items()}
             ep_results[mode] = best_f1_metrics(
                 scores_by_ep, labels, args.n_thresholds,
-                failure_steps=failure_steps, truncate=not args.no_truncate)
+                cutoffs=cutoffs, truncate=not args.no_truncate)
         print_table(ep_results, "episode")
 
     if args.level in ("step", "both"):
@@ -310,8 +368,7 @@ def main():
             thresh = config.get("threshold", 0.87)
             step_results[mode] = step_level_metrics(
                 scores_by_ep, labels, thresh, args.n_thresholds,
-                failure_steps=failure_steps,
-                num_pred=config.get("num_pred", 8),
+                windows=windows_for[mode],
                 truncate=not args.no_truncate,
             )
         print_table(step_results, "step")
