@@ -85,7 +85,11 @@ class SimContext:
         Called after every reset so tilts are measured relative to the actual starting pose,
         not the XML default. Records both the reference quaternion (kept for reference) and
         the reference tilt-from-vertical, which is what get_block_tilt actually uses."""
-        for name in ["block_left", "block_right"]:
+        # block_middle is the PICK TARGET, not a topple candidate, so it is excluded from
+        # check_failure -- but it is tracked here so its motion can be recorded. Without it
+        # the labels are blind to anything involving the target block, which makes an alarm
+        # driven by target-block motion indistinguishable from a false positive.
+        for name in ["block_left", "block_right", "block_middle"]:
             body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
             if body_id == -1:
                 continue
@@ -117,6 +121,14 @@ class SimContext:
         if block_name not in self._ref_axis_tilt:
             return 0.0
         return abs(self._axis_tilt(block_name) - self._ref_axis_tilt[block_name])
+
+    def get_block_xy(self, block_name):
+        """World xy of a block body, for tracking lateral displacement of the pick target."""
+        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, block_name)
+        if body_id == -1:
+            return (0.0, 0.0)
+        p = self.data.xpos[body_id]
+        return (float(p[0]), float(p[1]))
 
     def check_failure(self, threshold_deg=TOPPLE_THRESHOLD_DEG):
         """Check whether any adjacent block has toppled beyond threshold_deg.

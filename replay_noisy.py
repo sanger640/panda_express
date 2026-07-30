@@ -219,6 +219,11 @@ def main():
                 with SIM.lock:
                     tilt_l = SIM.get_block_tilt("block_left")
                     tilt_r = SIM.get_block_tilt("block_right")
+                    # target block: excluded from check_failure (it is meant to move), but
+                    # recorded so an alarm driven by its motion can be distinguished from a
+                    # genuine false positive
+                    tilt_m = SIM.get_block_tilt("block_middle")
+                    mx, my = SIM.get_block_xy("block_middle")
 
                 actual_trajectory_data.append({
                     'timestamp': time.time(),
@@ -230,6 +235,8 @@ def main():
                     'proc_gripper': actual_grip_bool,
                     'tilt_left': round(float(tilt_l), 4),
                     'tilt_right': round(float(tilt_r), 4),
+                    'tilt_middle': round(float(tilt_m), 4),
+                    'mid_xy': [round(mx, 5), round(my, 5)],
                 })
 
                 # Ground truth for THIS rollout, captured as it happens.
