@@ -148,7 +148,13 @@ def main():
             # D. Start Recording (To TARGET_TASK_DIR)
             # SimRecorder will automatically create the folder structure
             # recorder.i = current_idx
-            recorder.save_folder = TARGET_TASK_DIR+"episodes/" + str(current_idx) + "/rgb_frames/"
+            # os.path.join, not concatenation: the old form silently required
+            # TARGET_TASK_DIR to end in "/" (the hardcoded default did, --target-dir did
+            # not), sending every frame to "<dir>episodes/..." while the trajectory JSON
+            # below used os.path.join and landed correctly -- so episodes looked complete
+            # with zero images in them.
+            recorder.save_folder = os.path.join(TARGET_TASK_DIR, "episodes",
+                                                str(current_idx), "rgb_frames")
             os.makedirs(recorder.save_folder, exist_ok=True)
             # print("rec save foder")
             # print(recorder.save_folder)
@@ -203,6 +209,17 @@ def main():
                 #   proprio <- proc_pos / proc_gripper      (what the robot actually reached)
                 # Recording only the achieved pose left proc_* missing, so process_episode
                 # raised KeyError into its bare except and silently dropped every episode.
+                # Per-step tilt of both adjacent blocks, sampled from the SAME rollout that
+                # is being rendered. This is what a linear probe needs: re-simulating later
+                # cannot recover it, because reset_simulation perturbs block pose with
+                # np.random.uniform and saves neither the seed nor the initial qpos, so a
+                # fresh run is a different trajectory than these frames.
+                # Alignment is free: these ride on the waypoint's own timestamp, which is
+                # the key create_lmdb_single30.py already matches frames against.
+                with SIM.lock:
+                    tilt_l = SIM.get_block_tilt("block_left")
+                    tilt_r = SIM.get_block_tilt("block_right")
+
                 actual_trajectory_data.append({
                     'timestamp': time.time(),
                     'position': np.asarray(step['target_pos']).tolist(),
@@ -211,6 +228,8 @@ def main():
                     'proc_pos': curr_pos_tensor.numpy().tolist(),
                     'proc_quat': curr_quat_tensor.numpy().tolist(),
                     'proc_gripper': actual_grip_bool,
+                    'tilt_left': round(float(tilt_l), 4),
+                    'tilt_right': round(float(tilt_r), 4),
                 })
 
                 # Ground truth for THIS rollout, captured as it happens.

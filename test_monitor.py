@@ -124,6 +124,7 @@ def main():
     aggregator = TemporalAggregator(args.temporal_window, args.temporal_agg, args.ema_alpha)
 
     scores_out = {}  # {ep_name: {step: raw_score}}
+    alt_out = {}     # {metric: {ep_name: {step: score}}}
 
     env = lmdb.open(args.lmdb, readonly=True, lock=False)
     with env.begin() as txn:
@@ -151,6 +152,7 @@ def main():
 
             aggregator.reset()
             ep_scores = {}
+            ep_alt = {}
 
             print(f"\n[{ep_idx+1}/{len(ep_names)}] {ep_name}")
 
@@ -204,6 +206,9 @@ def main():
                 pred_imgs  = resp.get("states")
 
                 ep_scores[start] = raw_score
+                alt = resp.get('alt_scores') or {}
+                for k, v in alt.items():
+                    ep_alt.setdefault(k, {})[start] = float(v)
 
                 # Temporal aggregation
                 eff_score = aggregator.update(raw_score)
@@ -245,6 +250,8 @@ def main():
                     cv2.imwrite(os.path.join(ep_dir, f"step_{start:04d}.png"), viz)
 
             scores_out[ep_name] = ep_scores
+            for k, v in ep_alt.items():
+                alt_out.setdefault(k, {})[ep_name] = v
 
     env.close()
 
@@ -260,7 +267,7 @@ def main():
         "temporal_agg": args.temporal_agg,
     }
     with open(save_path, "w") as f:
-        json.dump({"config": meta, "scores": scores_out}, f, indent=2)
+        json.dump({"config": meta, "scores": scores_out, "alt_scores": alt_out}, f, indent=2)
 
     print(f"\nDone. Scores saved to {save_path}")
 

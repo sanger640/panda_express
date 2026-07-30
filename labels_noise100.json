@@ -1,0 +1,802 @@
+{
+  "0": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 5.811,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "1": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 15.176,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "2": {
+    "outcome": "failure",
+    "failure_step": 76,
+    "peak_tilt_deg": 90.683,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "3": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 17.362,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "4": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 17.651,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "5": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 3.434,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "6": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.781,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "7": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 15.058,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "8": {
+    "outcome": "failure",
+    "failure_step": 94,
+    "peak_tilt_deg": 95.208,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "9": {
+    "outcome": "failure",
+    "failure_step": 107,
+    "peak_tilt_deg": 90.993,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "10": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 6.392,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "11": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.714,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "12": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 12.049,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "13": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.277,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "14": {
+    "outcome": "failure",
+    "failure_step": 160,
+    "peak_tilt_deg": 94.001,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "15": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 10.479,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "16": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 6.958,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "17": {
+    "outcome": "failure",
+    "failure_step": 112,
+    "peak_tilt_deg": 90.498,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "18": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 13.883,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "19": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.568,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "20": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 12.291,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "21": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.632,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "22": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 10.743,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "23": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.164,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "24": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 6.076,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "25": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.669,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "26": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.734,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "27": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 16.168,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "28": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 6.621,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "29": {
+    "outcome": "failure",
+    "failure_step": 71,
+    "peak_tilt_deg": 94.48,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "30": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 12.228,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "31": {
+    "outcome": "failure",
+    "failure_step": 91,
+    "peak_tilt_deg": 92.634,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "32": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 10.006,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "33": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 16.4,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "34": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 15.755,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "35": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 18.303,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "36": {
+    "outcome": "failure",
+    "failure_step": 90,
+    "peak_tilt_deg": 90.667,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "37": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.127,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "38": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 14.495,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "39": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 7.068,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "40": {
+    "outcome": "failure",
+    "failure_step": 83,
+    "peak_tilt_deg": 92.238,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "41": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.575,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "42": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 15.525,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "43": {
+    "outcome": "failure",
+    "failure_step": 175,
+    "peak_tilt_deg": 92.879,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "44": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 7.399,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "45": {
+    "outcome": "failure",
+    "failure_step": 72,
+    "peak_tilt_deg": 94.477,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "46": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 13.016,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "47": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.311,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "48": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.872,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "49": {
+    "outcome": "failure",
+    "failure_step": 63,
+    "peak_tilt_deg": 91.304,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "50": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.389,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "51": {
+    "outcome": "failure",
+    "failure_step": 128,
+    "peak_tilt_deg": 90.818,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "52": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 10.702,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "53": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 7.74,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "54": {
+    "outcome": "failure",
+    "failure_step": 98,
+    "peak_tilt_deg": 93.73,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "55": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 16.295,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "56": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.735,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "57": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 13.185,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "58": {
+    "outcome": "failure",
+    "failure_step": 65,
+    "peak_tilt_deg": 93.851,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "59": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.13,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "60": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 12.301,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "61": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 14.631,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "62": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 7.353,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "63": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 14.688,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "64": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.191,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "65": {
+    "outcome": "failure",
+    "failure_step": 70,
+    "peak_tilt_deg": 94.864,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "66": {
+    "outcome": "failure",
+    "failure_step": 71,
+    "peak_tilt_deg": 90.78,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "67": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.502,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "68": {
+    "outcome": "failure",
+    "failure_step": 71,
+    "peak_tilt_deg": 91.718,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "69": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 17.063,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "70": {
+    "outcome": "failure",
+    "failure_step": 176,
+    "peak_tilt_deg": 91.028,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "71": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.696,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "72": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 15.111,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "73": {
+    "outcome": "failure",
+    "failure_step": 40,
+    "peak_tilt_deg": 91.67,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "74": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 7.154,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "75": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.274,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "76": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.512,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "77": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 10.333,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "78": {
+    "outcome": "failure",
+    "failure_step": 40,
+    "peak_tilt_deg": 92.962,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "79": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.912,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "80": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 17.698,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "81": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.497,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "82": {
+    "outcome": "failure",
+    "failure_step": 69,
+    "peak_tilt_deg": 93.072,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "83": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 11.929,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "84": {
+    "outcome": "failure",
+    "failure_step": 64,
+    "peak_tilt_deg": 90.689,
+    "failure_block": "block_left",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "85": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 14.361,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "86": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 16.761,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "87": {
+    "outcome": "failure",
+    "failure_step": 76,
+    "peak_tilt_deg": 92.854,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "88": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.23,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "89": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.625,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "90": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 12.72,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "91": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 16.742,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "92": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.603,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "93": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 16.181,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "94": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 10.798,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "95": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 8.904,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "96": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 9.507,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "97": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 17.368,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "98": {
+    "outcome": "failure",
+    "failure_step": 89,
+    "peak_tilt_deg": 95.069,
+    "failure_block": "block_right",
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  },
+  "99": {
+    "outcome": "success",
+    "failure_step": null,
+    "peak_tilt_deg": 7.769,
+    "failure_block": null,
+    "topple_threshold_deg": 45.0,
+    "source": "recorded_during_replay"
+  }
+}
